@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta
 from typing import List
-from tests.base import TestResult
+from tests.base import TestResult, now_kst
 
 
 def build_report(results: List[TestResult], elapsed: float) -> str:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_kst().strftime("%Y-%m-%d %H:%M:%S (KST)")
     pc_results = [r for r in results if r.platform == "PC"]
     mob_results = [r for r in results if r.platform == "Mobile"]
 
@@ -59,7 +58,7 @@ def build_report(results: List[TestResult], elapsed: float) -> str:
 
 def build_simple_message(results: List[TestResult]) -> str:
     """두레이용 간단한 요약 메시지"""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_kst().strftime("%Y-%m-%d %H:%M:%S (KST)")
     total_fail = sum(1 for r in results if not r.passed)
 
     lines = [

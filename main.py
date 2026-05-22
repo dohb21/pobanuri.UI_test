@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-from tests.base import TestResult, init_browser, run_test
+from tests.base import KST, TestResult, init_browser, run_test, now_kst
 from tests import test_main, test_popup, test_search, test_category, test_gnb, test_popular, test_cart, test_shipping
 from report.generator import build_report, build_simple_message
 from report.dooray import send as dooray_send
@@ -132,12 +132,12 @@ def cleanup_old_files(base_dir: str, days: int = 7):
     if not os.path.exists(base_dir):
         return
 
-    cutoff = datetime.now() - timedelta(days=days)
+    cutoff = now_kst() - timedelta(days=days)
     try:
         for file in os.listdir(base_dir):
             file_path = os.path.join(base_dir, file)
             if os.path.isfile(file_path):
-                mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+                mtime = datetime.fromtimestamp(os.path.getmtime(file_path), KST)
                 if mtime < cutoff:
                     os.remove(file_path)
                     print(f"[정리] 삭제: {file}")
@@ -148,7 +148,7 @@ def cleanup_old_files(base_dir: str, days: int = 7):
 def main():
     start = time.time()
     print("\n" + "=" * 60)
-    print(f"🚀 드림몰 UI 테스트 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🚀 드림몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")
     print("=" * 60)
     print("\n📋 콘솔 출력을 통해 상세한 테스트 과정을 추적할 수 있습니다.")
     print("   팝업, 검색, 카테고리 등 각 테스트의 성공/실패 원인이 표시됩니다.\n")
@@ -179,7 +179,7 @@ def main():
     # MD 파일로 저장
     reports_dir = os.path.join(os.path.dirname(__file__), "reports")
     os.makedirs(reports_dir, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = now_kst().strftime("%Y%m%d_%H%M%S")
     report_path = os.path.join(reports_dir, f"report_{ts}.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)

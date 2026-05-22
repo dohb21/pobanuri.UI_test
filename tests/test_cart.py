@@ -53,6 +53,68 @@ def _goto_cart(page: Page, base_url: str):
             continue
 
 
+def _count_cart_items(page: Page) -> int:
+    for sel in CART_ITEM_SELECTORS:
+        try:
+            cnt = page.locator(sel).count()
+            if cnt > 0:
+                return cnt
+        except Exception:
+            continue
+    return 0
+
+
+def _empty_cart(page: Page, base_url: str) -> int:
+    """장바구니 비우기. 최종 항목 수 반환."""
+    _goto_cart(page, base_url)
+    time.sleep(0.5)
+    # 전체선택 체크
+    for sel in [
+        "input[type='checkbox'][id*='all']",
+        "input[type='checkbox'][id*='All']",
+        "input[type='checkbox'][class*='all']",
+        "input[type='checkbox'][name*='all']",
+    ]:
+        try:
+            chk = page.locator(sel).first
+            if chk.count() > 0 and chk.is_visible(timeout=800):
+                if not chk.is_checked():
+                    try:
+                        chk.check(timeout=1500)
+                    except Exception:
+                        chk.evaluate("el => { el.checked = true; el.dispatchEvent(new Event('click', {bubbles:true})); }")
+                time.sleep(0.3)
+                break
+        except Exception:
+            continue
+    # 선택삭제 클릭
+    for sel in [
+        "button:has-text('선택삭제')",
+        "button:has-text('선택 삭제')",
+        "a:has-text('선택삭제')",
+        "button:has-text('삭제')",
+    ]:
+        try:
+            btn = page.locator(sel).first
+            if btn.count() > 0 and btn.is_visible(timeout=800):
+                try:
+                    btn.click(timeout=2000)
+                except Exception:
+                    btn.evaluate("el => el.click()")
+                time.sleep(1.5)
+                break
+        except Exception:
+            continue
+    # 페이지 새로고침해서 정확한 잔여 카운트 측정
+    try:
+        page.reload(wait_until="load", timeout=10000)
+        close_popups(page)
+        time.sleep(0.5)
+    except Exception:
+        pass
+    return _count_cart_items(page)
+
+
 def _scroll_to_popular(page: Page):
     """하단 인기상품 섹션 스크롤 및 로드 대기"""
     try:
@@ -241,7 +303,7 @@ def _pc_cart_flow(page: Page) -> tuple:
 
 def _mobile_cart_flow(page: Page, base: str) -> tuple:
     """
-    Mobile 흐름:
+    Mobile 흐름 (PC 와 겹치지 않게 인기상품 두 번째 상품부터 시도):
     인기상품 섹션 상품 클릭 (상세 이동)
     → button#btnGoodsBuyLayerOpen (구매하기)
     → #layerPop-goodsOptionSelect 에서 옵션 선택 (있으면)
@@ -249,10 +311,13 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
     → alert 처리
     """
     hrefs = _get_popular_hrefs(page, base)
-    assert hrefs, "인기상품에서 상품 링크를 찾을 수 없음"
+    assert len(hrefs) >= 2, (
+        f"인기상품에서 두 번째 상품 링크를 찾을 수 없음 (발견 {len(hrefs)}개)"
+    )
 
     product_name = ""
-    for href in hrefs[:5]:
+    print(f"  [Mobile 장바구니] 인기상품 {len(hrefs)}개 중 2번째부터 순회")
+    for href in hrefs[1:6]:
         try:
             page.goto(href, wait_until="load", timeout=15000)
             close_popups(page)
@@ -336,6 +401,11 @@ def run(page: Page, url: str, username: str, password: str) -> str:
         ok = login(page, url, username, password)
         assert ok, "로그인 실패"
 
+        # 사전 정리: 장바구니 비우기 (이전 실행 잔여물 제거)
+        print(f"  [장바구니 사전 정리] 장바구니 비우기 시도")
+        initial_count = _empty_cart(page, url)
+        print(f"  [장바구니 사전 정리] 정리 후 항목 수: {initial_count}")
+
         # 메인으로 이동 & 인기상품 섹션 로드
         page.goto(url, wait_until="load", timeout=20000)
         close_popups(page)
@@ -358,39 +428,24 @@ def run(page: Page, url: str, username: str, password: str) -> str:
 
         time.sleep(1)
 
-        item_count = 0
-        for sel in CART_ITEM_SELECTORS:
-            try:
-                cnt = page.locator(sel).count()
-                if cnt > 0:
-                    print(f"  [장바구니 확인] 셀렉터 '{sel}' 로 {cnt}개 항목 발견")
-                    item_count = cnt
-                    break
-            except Exception:
-                continue
+        item_count = _count_cart_items(page)
+        print(f"  [장바구니 확인] 사전 {initial_count}개 → 사후 {item_count}개")
 
-        if item_count == 0:
-            print(f"  [장바구니 확인] ⚠️ 장바구니에 항목이 없음 (모든 셀렉터 시도 완료)")
+        # 사전 정리 후 카운트가 실제로 증가했는지로 검증 (false positive 방지)
+        assert item_count > initial_count, (
+            f"장바구니에 상품이 추가되지 않음 (사전 {initial_count}개 → 사후 {item_count}개)"
+        )
 
-        assert item_count > 0, "장바구니에 상품이 추가되지 않음"
-
-        # 클린업
+        # 사후 정리
         try:
-            all_check = page.locator(
-                "input[type='checkbox'][id*='all'], input[type='checkbox'][class*='all'], "
-                "input[type='checkbox'][name*='all']"
-            ).first
-            if all_check.is_visible(timeout=2000):
-                all_check.check()
-                time.sleep(0.3)
-            del_btn = page.locator("button:has-text('삭제'), button:has-text('선택삭제')").first
-            if del_btn.is_visible(timeout=2000):
-                del_btn.evaluate("el => el.click()")
-                time.sleep(1)
+            _empty_cart(page, url)
         except Exception:
             pass
 
-        return f"'{product_name}' 장바구니 담기 성공 (항목 {item_count}개 확인)"
+        return (
+            f"'{product_name}' 장바구니 담기 성공 "
+            f"(사전 {initial_count} → 사후 {item_count})"
+        )
 
     finally:
         try:

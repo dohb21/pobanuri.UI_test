@@ -3,8 +3,15 @@ import pathlib
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from playwright.sync_api import Page, Playwright
+
+
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst() -> datetime:
+    return datetime.now(KST)
 
 
 SCREENSHOT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "screenshots")
@@ -173,7 +180,7 @@ def login(page: Page, base_url: str, username: str, password: str) -> bool:
 
 def save_screenshot(page: Page, platform: str, test_name: str) -> str:
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = now_kst().strftime("%Y%m%d_%H%M%S")
     safe_name = test_name.replace("/", "_").replace(" ", "_")
     filename = f"{ts}_{platform}_{safe_name}.png"
     path = os.path.join(SCREENSHOT_DIR, filename)
