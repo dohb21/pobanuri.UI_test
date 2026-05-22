@@ -1,5 +1,6 @@
 import os
 import pathlib
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -33,31 +34,52 @@ class TestResult:
     note: str = ""
 
 
-def _find_chromium() -> str:
-    local_app = (
-        os.environ.get("LOCALAPPDATA")
-        or str(pathlib.Path.home() / "AppData" / "Local")
-    )
-    base = pathlib.Path(local_app) / "ms-playwright"
-    if base.exists():
+def _playwright_base_dirs() -> list[pathlib.Path]:
+    candidates: list[pathlib.Path] = []
+    env_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if env_path:
+        candidates.append(pathlib.Path(env_path))
+    if sys.platform == "win32":
+        local_app = (
+            os.environ.get("LOCALAPPDATA")
+            or str(pathlib.Path.home() / "AppData" / "Local")
+        )
+        candidates.append(pathlib.Path(local_app) / "ms-playwright")
+    elif sys.platform == "darwin":
+        candidates.append(pathlib.Path.home() / "Library" / "Caches" / "ms-playwright")
+    else:
+        candidates.append(pathlib.Path.home() / ".cache" / "ms-playwright")
+    return candidates
+
+
+def _find_chromium() -> str | None:
+    if sys.platform == "win32":
+        rel = pathlib.Path("chrome-win64") / "chrome.exe"
+    elif sys.platform == "darwin":
+        rel = pathlib.Path("chrome-mac") / "Chromium.app" / "Contents" / "MacOS" / "Chromium"
+    else:
+        rel = pathlib.Path("chrome-linux") / "chrome"
+
+    for base in _playwright_base_dirs():
+        if not base.exists():
+            continue
         for entry in sorted(base.iterdir(), reverse=True):
             if entry.name.startswith("chromium-") and "headless" not in entry.name:
-                chrome = entry / "chrome-win64" / "chrome.exe"
+                chrome = entry / rel
                 if chrome.exists():
                     return str(chrome)
-    raise FileNotFoundError(
-        f"Chromium을 찾을 수 없습니다 ({base}). "
-        "'python -m playwright install chromium' 실행 후 재시도"
-    )
+    return None
 
 
 def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False):
+    launch_kwargs = {
+        "headless": False,
+        "args": ["--headless=new", "--disable-gpu", "--no-sandbox"],
+    }
     chromium_exe = _find_chromium()
-    browser = playwright.chromium.launch(
-        headless=False,
-        executable_path=chromium_exe,
-        args=["--headless=new", "--disable-gpu", "--no-sandbox"],
-    )
+    if chromium_exe:
+        launch_kwargs["executable_path"] = chromium_exe
+    browser = playwright.chromium.launch(**launch_kwargs)
 
     # 비디오 녹화 설정
     context_args = {}
