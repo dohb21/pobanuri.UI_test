@@ -93,24 +93,63 @@ def _get_popular_hrefs(page: Page, base: str) -> list:
     return hrefs
 
 
-def _select_first_option(page: Page, container_sel: str = None):
-    """옵션 select 또는 radio 의 첫 번째 항목 선택"""
-    loc = page.locator(container_sel) if container_sel else page
+def _select_first_option(page: Page, container_sel: str = None) -> bool:
+    """드림몰 옵션 선택. .optSelectWrap (PC=div.radio, Mobile=label.radio) 마다
+    첫 번째 라디오를 클릭하여 OnnuriGoodsOptionUtil.goodsDtlOptionClick 을 트리거.
+    옵션 그룹이 여러 개면 각 그룹 모두 선택해야 alert 가 뜨지 않는다."""
+    scope = page.locator(container_sel) if container_sel else page
+    selected = False
+
+    wraps = scope.locator(".optSelectWrap").all()
+    for wrap in wraps:
+        # 각 옵션 그룹의 첫 번째 라디오 컨테이너
+        container = wrap.locator("label.radio, div.radio").first
+        if container.count() == 0:
+            continue
+        radio = container.locator("input[type='radio']").first
+        if radio.count() == 0:
+            continue
+        try:
+            # input 이 hidden 일 수 있어 force=True
+            radio.click(timeout=2000, force=True)
+            selected = True
+        except Exception:
+            try:
+                container.click(timeout=2000)
+                selected = True
+            except Exception:
+                try:
+                    radio.evaluate(
+                        "el => { el.checked = true;"
+                        " if (window.OnnuriGoodsOptionUtil)"
+                        " OnnuriGoodsOptionUtil.goodsDtlOptionClick(el); }"
+                    )
+                    selected = True
+                except Exception:
+                    continue
+        time.sleep(0.3)
+
+    if selected:
+        return True
+
+    # 폴백: native select / radio
     try:
-        opt = loc.locator("select").first
+        opt = scope.locator("select").first
         if opt.is_visible(timeout=1000):
-            opt.select_option(index=1)   # index 0 = "선택하세요"
+            opt.select_option(index=1)
             time.sleep(0.3)
-            return
+            return True
     except Exception:
         pass
     try:
-        radio = loc.locator("input[type='radio']").first
+        radio = scope.locator("input[type='radio']").first
         if radio.is_visible(timeout=500):
             radio.check()
             time.sleep(0.3)
+            return True
     except Exception:
         pass
+    return False
 
 
 def _pc_cart_flow(page: Page) -> tuple:
@@ -174,7 +213,9 @@ def _pc_cart_flow(page: Page) -> tuple:
 
     if detail_btn:
         print(f"  [PC 장바구니] 상세 장바구니 버튼 발견, 옵션 선택 시도")
-        _select_first_option(page)
+        ok_opt = _select_first_option(page)
+        wrap_cnt = page.locator(".optSelectWrap").count()
+        print(f"  [PC 장바구니] 옵션 그룹 {wrap_cnt}개, 선택 {'성공' if ok_opt else '실패/없음'}")
         print(f"  [PC 장바구니] 상세 장바구니 버튼 클릭 시도")
         try:
             onclick = detail_btn.get_attribute("onclick")
@@ -243,8 +284,12 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
             try:
                 layer = page.locator("#layerPop-goodsOptionSelect").first
                 if layer.is_visible(timeout=2000):
-                    print(f"  [Mobile 장바구니] 옵션 레이어 발견, 첫 번째 옵션 선택")
-                    _select_first_option(page, "#layerPop-goodsOptionSelect")
+                    wrap_cnt = page.locator(
+                        "#layerPop-goodsOptionSelect .optSelectWrap"
+                    ).count()
+                    print(f"  [Mobile 장바구니] 옵션 레이어 발견, 옵션 그룹 {wrap_cnt}개")
+                    ok_opt = _select_first_option(page, "#layerPop-goodsOptionSelect")
+                    print(f"  [Mobile 장바구니] 옵션 선택 {'성공' if ok_opt else '실패/없음'}")
             except Exception:
                 pass
 

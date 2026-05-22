@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:/Users/PC/.claude/projects/e--Onuri-UI-test/memory/\" 2>nul)",
+      "Read(//c/Users/PC/.claude/projects/e--Onuri-UI-test/**)"
+    ]
+  }
+}
