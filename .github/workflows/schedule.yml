@@ -1,4 +1,4 @@
-name: 9-5 scheduler
+name: 9-17 scheduler
 
 on:
   schedule:
