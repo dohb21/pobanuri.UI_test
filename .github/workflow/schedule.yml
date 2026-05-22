@@ -6,6 +6,9 @@ on:
     - cron: '0 0 * * *' 
     # 매일 08:00 UTC (한국 시간으로 17:00)에 실행
     - cron: '0 8 * * *' 
+  
+  # 수동 트리거 사용
+  workflow_dispatch:
 
 jobs:
   ui_test_job:
