@@ -70,7 +70,7 @@ def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
         # 5. GNB 메뉴
         print(f"  [5/8] GNB 메뉴 진입...", end=" ", flush=True)
         result = run_test("GNB 메뉴 진입", platform, page,
-                         lambda p: test_gnb.run(p, url))
+                         lambda p: test_gnb.run(p, url, username, password))
         results.append(result)
         print("✅" if result.passed else f"❌ {result.error_msg[:30]}")
 
