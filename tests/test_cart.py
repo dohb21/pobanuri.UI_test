@@ -23,20 +23,20 @@ DETAIL_CART_BTN_SELECTORS = [
 ]
 
 CART_ITEM_SELECTORS = [
-    "input[type='number']",
-    "input[type='checkbox'][name*='goods']",
-    "input[type='checkbox'][name*='prd']",
-    "input[type='checkbox'][name*='cart']",
-    "input[type='checkbox'][id*='chk']",
     "[class*='cartItem']",
     "[class*='cart-item']",
     "[class*='cartPrd']",
+    "[class*='goodsNm']",
+    ".prd-name",
     "[class*='cart_list'] li",
     ".orderList li",
     ".cartList li",
     "table[class*='cart'] tr:not(:first-child)",
-    "[class*='goodsNm']",
-    ".prd-name",
+    "input[type='checkbox'][name*='goods']",
+    "input[type='checkbox'][name*='prd']",
+    "input[type='checkbox'][name*='cart']",
+    "input[type='checkbox'][id*='chk']",
+    "input[type='number']",
 ]
 
 CART_PATHS = ["/order/indexCartList", "/cart", "/basket"]
@@ -53,7 +53,20 @@ def _goto_cart(page: Page, base_url: str):
             continue
 
 
-def _count_cart_items(page: Page) -> int:
+def _count_cart_items(page: Page, base_url: str = "") -> int:
+    if base_url:
+        base = base_url.replace("/main", "")
+        try:
+            count = page.evaluate("""(base) => {
+                return fetch(base + '/common/getCartCnt?temp=' + new Date().toString())
+                    .then(r => r.json())
+                    .then(d => typeof d.cartCnt !== 'undefined' ? d.cartCnt : -1)
+                    .catch(() => -1);
+            }""", base)
+            if isinstance(count, (int, float)) and count >= 0:
+                return int(count)
+        except Exception:
+            pass
     for sel in CART_ITEM_SELECTORS:
         try:
             cnt = page.locator(sel).count()
@@ -112,7 +125,7 @@ def _empty_cart(page: Page, base_url: str) -> int:
         time.sleep(0.5)
     except Exception:
         pass
-    return _count_cart_items(page)
+    return _count_cart_items(page, base_url)
 
 
 def _scroll_to_popular(page: Page):
@@ -428,7 +441,7 @@ def run(page: Page, url: str, username: str, password: str) -> str:
 
         time.sleep(1)
 
-        item_count = _count_cart_items(page)
+        item_count = _count_cart_items(page, url)
         print(f"  [장바구니 확인] 사전 {initial_count}개 → 사후 {item_count}개")
 
         # 사전 정리 후 카운트가 실제로 증가했는지로 검증 (false positive 방지)
