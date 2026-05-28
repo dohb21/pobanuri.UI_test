@@ -41,6 +41,15 @@ CART_ITEM_SELECTORS = [
 
 CART_PATHS = ["/order/indexCartList", "/cart", "/basket"]
 
+ORDER_BTN_SELECTORS = [
+    "button[name='orderBtn']",
+    "button.btn.lg.primary[name='orderBtn']",
+    "button.btn-basicL[name='orderBtn']",
+    "button:has-text('주문하기')",
+]
+
+ORDER_PAYMENT_PATH = "/order/indexOrderPayment"
+
 
 def _goto_cart(page: Page, base_url: str):
     base = base_url.replace("/main", "")
@@ -394,6 +403,26 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
     return product_name, False
 
 
+def _click_order_btn(page: Page) -> bool:
+    """주문하기 버튼 클릭. 성공 여부 반환."""
+    for sel in ORDER_BTN_SELECTORS:
+        try:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=2000):
+                print(f"  [주문하기] 버튼 발견 ({sel}), 클릭 시도")
+                try:
+                    btn.click(timeout=3000)
+                    print(f"  [주문하기] ✅ click() 성공")
+                except Exception as e:
+                    print(f"  [주문하기] ❌ click() 실패 ({str(e)[:40]}), evaluate로 재시도")
+                    btn.evaluate("el => el.click()")
+                    print(f"  [주문하기] ✅ evaluate click() 성공")
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def run(page: Page, url: str, username: str, password: str) -> str:
     base = url.replace("/main", "")
     is_mobile = "mdream" in url
@@ -449,6 +478,24 @@ def run(page: Page, url: str, username: str, password: str) -> str:
             f"장바구니에 상품이 추가되지 않음 (사전 {initial_count}개 → 사후 {item_count}개)"
         )
 
+        # ── 주문하기 버튼 클릭 및 결제 페이지 이동 확인 ──────────────────────
+        close_popups(page)
+        print(f"  [주문하기] 주문하기 버튼 클릭 시도")
+        order_clicked = _click_order_btn(page)
+        assert order_clicked, "주문하기 버튼을 찾을 수 없음"
+
+        try:
+            page.wait_for_url(f"**{ORDER_PAYMENT_PATH}**", timeout=10000)
+        except Exception:
+            pass
+
+        current_url = page.url
+        print(f"  [주문하기] 현재 URL: {current_url}")
+        assert ORDER_PAYMENT_PATH in current_url, (
+            f"결제 페이지로 이동 실패 (현재: {current_url})"
+        )
+        print(f"  [주문하기] ✅ {ORDER_PAYMENT_PATH} 이동 성공")
+
         # 사후 정리
         try:
             _empty_cart(page, url)
@@ -457,7 +504,8 @@ def run(page: Page, url: str, username: str, password: str) -> str:
 
         return (
             f"'{product_name}' 장바구니 담기 성공 "
-            f"(사전 {initial_count} → 사후 {item_count})"
+            f"(사전 {initial_count} → 사후 {item_count}), "
+            f"주문하기 → {ORDER_PAYMENT_PATH} 이동 성공"
         )
 
     finally:
