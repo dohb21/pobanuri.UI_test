@@ -403,21 +403,57 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
     return product_name, False
 
 
+def _select_all_cart_items(page: Page):
+    """장바구니 전체선택 체크박스 체크."""
+    for sel in [
+        "input[type='checkbox'][id*='all']",
+        "input[type='checkbox'][id*='All']",
+        "input[type='checkbox'][class*='all']",
+        "input[type='checkbox'][name*='all']",
+    ]:
+        try:
+            chk = page.locator(sel).first
+            if chk.count() > 0 and chk.is_visible(timeout=800):
+                if not chk.is_checked():
+                    try:
+                        chk.check(timeout=1500)
+                    except Exception:
+                        chk.evaluate(
+                            "el => { el.checked = true;"
+                            " el.dispatchEvent(new Event('click', {bubbles:true})); }"
+                        )
+                print(f"  [주문하기] 전체선택 체크 완료 ({sel})")
+                time.sleep(0.3)
+                return
+        except Exception:
+            continue
+
+
 def _click_order_btn(page: Page) -> bool:
-    """주문하기 버튼 클릭. 성공 여부 반환."""
+    """전체선택 후 주문하기 버튼을 스크롤하여 클릭. 성공 여부 반환."""
+    _select_all_cart_items(page)
+
     for sel in ORDER_BTN_SELECTORS:
         try:
             btn = page.locator(sel).first
-            if btn.is_visible(timeout=2000):
-                print(f"  [주문하기] 버튼 발견 ({sel}), 클릭 시도")
-                try:
-                    btn.click(timeout=3000)
-                    print(f"  [주문하기] ✅ click() 성공")
-                except Exception as e:
-                    print(f"  [주문하기] ❌ click() 실패 ({str(e)[:40]}), evaluate로 재시도")
-                    btn.evaluate("el => el.click()")
-                    print(f"  [주문하기] ✅ evaluate click() 성공")
-                return True
+            if btn.count() == 0:
+                continue
+            try:
+                btn.scroll_into_view_if_needed(timeout=3000)
+                time.sleep(0.3)
+            except Exception:
+                pass
+            if not btn.is_visible(timeout=2000):
+                continue
+            print(f"  [주문하기] 버튼 발견 ({sel}), 클릭 시도")
+            try:
+                btn.click(timeout=5000)
+                print(f"  [주문하기] ✅ click() 성공")
+            except Exception as e:
+                print(f"  [주문하기] ❌ click() 실패 ({str(e)[:40]}), evaluate로 재시도")
+                btn.evaluate("el => el.click()")
+                print(f"  [주문하기] ✅ evaluate click() 성공")
+            return True
         except Exception:
             continue
     return False
