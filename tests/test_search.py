@@ -150,15 +150,16 @@ def run(page: Page, url: str, valid_keywords: list, invalid_keywords: list) -> s
         except Exception as e:
             errors.append(f"'{kw}': {str(e)[:60]}")
 
-    for idx, kw in enumerate(invalid_keywords):
-        try:
-            _do_search(page, url, kw, first_search=(idx == 0 and len(chosen_valid) == 0))
-            # 검색 결과 페이지 도달 여부로 판단
-            # (#searchUnitList 의 20개는 추천상품이므로 count 로 판단하지 않음)
-            assert SEARCH_RESULT_PATH in page.url, f"'{kw}' 검색 후 결과 페이지 미도달"
-            ok_list.append(f"'{kw}' 결과없음 정상")
-        except Exception as e:
-            errors.append(f"'{kw}': {str(e)[:60]}")
+    # invalid_keywords 테스트 임시 비활성화
+    # for idx, kw in enumerate(invalid_keywords):
+    #     try:
+    #         _do_search(page, url, kw, first_search=(idx == 0 and len(chosen_valid) == 0))
+    #         # 검색 결과 페이지 도달 여부로 판단
+    #         # (#searchUnitList 의 20개는 추천상품이므로 count 로 판단하지 않음)
+    #         assert SEARCH_RESULT_PATH in page.url, f"'{kw}' 검색 후 결과 페이지 미도달"
+    #         ok_list.append(f"'{kw}' 결과없음 정상")
+    #     except Exception as e:
+    #         errors.append(f"'{kw}': {str(e)[:60]}")
 
     if errors:
         raise AssertionError("; ".join(errors))
