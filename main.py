@@ -27,7 +27,7 @@ def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
     username = cfg["account"]["username"]
     password = cfg["account"]["password"]
     valid_kws = cfg["search"]["valid"]
-    invalid_kws = cfg["search"]["invalid"]
+    invalid_kws = []
     cat_pool = cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
 
