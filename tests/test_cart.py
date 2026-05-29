@@ -155,23 +155,42 @@ def _scroll_to_popular(page: Page):
 
 
 def _get_popular_hrefs(page: Page, base: str) -> list:
-    """인기상품 섹션에서 상품 URL 목록 반환
-    href 형태:
-      - 일반 URL: /goods/indexGoodsDetail?goodsId=...
-      - JS 형태:  javascript:gfn_baseLocationHref('/goods/indexGoodsDetail?goodsId=...')
+    """인기상품 섹션에서 상품 URL 목록 반환.
+    href / onclick / data-* 등에서 indexGoodsDetail URL 추출.
     """
     hrefs = []
+    _GOODS_PATTERN = re.compile(r"""['"](/[^'"]*indexGoodsDetail[^'"]*)['"]""")
+
+    def _extract(text: str) -> str:
+        if not text:
+            return ""
+        if "indexGoodsDetail" in text and "javascript:" not in text:
+            return text  # 일반 URL
+        m = _GOODS_PATTERN.search(text)
+        return m.group(1) if m else ""
+
     for li in page.locator("#searchUnitList li").all()[:15]:
         try:
+            path = ""
+            # 1) href 에 indexGoodsDetail 포함
             a = li.locator("a[href*='indexGoodsDetail']").first
             if a.count() > 0:
-                href = a.get_attribute("href") or ""
-                # javascript:gfn_baseLocationHref('/goods/indexGoodsDetail?goodsId=...')
-                if "javascript:" in href:
-                    m = re.search(r"""['"](/[^'"]*indexGoodsDetail[^'"]*)['"]""", href)
-                    href = m.group(1) if m else ""
-                if href:
-                    hrefs.append(href if href.startswith("http") else base + href)
+                path = _extract(a.get_attribute("href") or "")
+
+            # 2) onclick 에 indexGoodsDetail 포함 (href=javascript:; 형태)
+            if not path:
+                a2 = li.locator("a[onclick*='indexGoodsDetail']").first
+                if a2.count() > 0:
+                    path = _extract(a2.get_attribute("onclick") or "")
+
+            # 3) href 가 javascript: 이지만 안에 URL 포함
+            if not path:
+                a3 = li.locator("a[href^='javascript:']").first
+                if a3.count() > 0:
+                    path = _extract(a3.get_attribute("href") or "")
+
+            if path:
+                hrefs.append(path if path.startswith("http") else base + path)
         except Exception:
             continue
     return hrefs
@@ -333,13 +352,14 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
     → alert 처리
     """
     hrefs = _get_popular_hrefs(page, base)
-    assert len(hrefs) >= 2, (
-        f"인기상품에서 두 번째 상품 링크를 찾을 수 없음 (발견 {len(hrefs)}개)"
+    print(f"  [Mobile 장바구니] 인기상품 링크 {len(hrefs)}개 발견")
+    assert len(hrefs) >= 1, (
+        f"인기상품 링크를 찾을 수 없음 (발견 {len(hrefs)}개)"
     )
 
     product_name = ""
-    print(f"  [Mobile 장바구니] 인기상품 {len(hrefs)}개 중 2번째부터 순회")
-    for href in hrefs[1:6]:
+    print(f"  [Mobile 장바구니] 인기상품 {len(hrefs)}개 순회")
+    for href in hrefs[:6]:
         try:
             page.goto(href, wait_until="load", timeout=15000)
             close_popups(page)
