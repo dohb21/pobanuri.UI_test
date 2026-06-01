@@ -4,7 +4,8 @@
       "Bash(ls \"C:/Users/PC/.claude/projects/e--Onuri-UI-test/memory/\" 2>nul)",
       "Read(//c/Users/PC/.claude/projects/e--Onuri-UI-test/**)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('tests/test_cart.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('main.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('report/generator.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('tests/base.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
-      "Bash(ls e:/Onuri/UI_test/reports/ 2>nul)"
+      "Bash(ls e:/Onuri/UI_test/reports/ 2>nul)",
+      "Read(//e/Onuri/Admin_stat/**)"
     ],
     "additionalDirectories": [
       "e:\\Onuri\\UI_test"

@@ -78,10 +78,10 @@ def _find_chromium() -> str | None:
     return None
 
 
-def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False):
+def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True):
     launch_kwargs = {
-        "headless": False,
-        "args": ["--headless=new", "--disable-gpu", "--no-sandbox"],
+        "headless": headless,
+        "args": ["--disable-gpu", "--no-sandbox"],
     }
     chromium_exe = _find_chromium()
     if chromium_exe:

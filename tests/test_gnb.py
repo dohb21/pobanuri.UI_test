@@ -184,8 +184,11 @@ def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tu
     """JS 링크 클릭 → URL 변경 또는 모달 열림 확인"""
     try:
         el = _get_item_el(page, item, is_mobile)
-        el.scroll_into_view_if_needed(timeout=2000)
-        el.click(timeout=5000)
+        try:
+            el.scroll_into_view_if_needed(timeout=2000)
+        except Exception:
+            pass
+        el.click(timeout=5000, force=is_mobile)
         time.sleep(1.5)
 
         cur = page.url

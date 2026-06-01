@@ -21,18 +21,17 @@ def load_config() -> dict:
         return yaml.safe_load(f)
 
 
-def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
+def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> list[TestResult]:
     platform = "Mobile" if mobile else "PC"
     url = cfg["urls"]["mobile"] if mobile else cfg["urls"]["pc"]
     username = cfg["account"]["username"]
     password = cfg["account"]["password"]
     valid_kws = cfg["search"]["valid"]
-    invalid_kws = cfg["search"]["invalid"]
     cat_pool = cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
 
     results = []
-    browser, context, page = init_browser(playwright, mobile=mobile)
+    browser, context, page = init_browser(playwright, mobile=mobile, headless=headless)
 
     try:
         # 1. 메인 화면 진입
@@ -44,7 +43,7 @@ def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
 
         # 2. 메인 팝업 (비디오 녹화 + 스크린샷)
         print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
-        browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True)
+        browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True, headless=headless)
         try:
             result = run_test("메인 팝업 노출", platform, page2,
                             lambda p: test_popup.run(p, url), save_all_screenshots=True)
@@ -56,7 +55,7 @@ def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
         # 3. 검색
         print(f"  [3/8] 검색 기능...", end=" ", flush=True)
         result = run_test("검색 기능", platform, page,
-                         lambda p: test_search.run(p, url, valid_kws, invalid_kws))
+                         lambda p: test_search.run(p, url, valid_kws))
         results.append(result)
         print("✅" if result.passed else f"❌ {result.error_msg[:30]}")
 
@@ -107,19 +106,19 @@ def run_platform(playwright, cfg: dict, mobile: bool) -> list[TestResult]:
     return results
 
 
-def run_all(cfg: dict) -> list[TestResult]:
+def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
     all_results = []
     with sync_playwright() as playwright:
         print("\n[PC] 테스트 시작...")
         print("-" * 50)
-        pc_results = run_platform(playwright, cfg, mobile=False)
+        pc_results = run_platform(playwright, cfg, mobile=False, headless=headless)
         all_results += pc_results
         pc_pass = sum(1 for r in pc_results if r.passed)
         print(f"PC 완료: {pc_pass}/{len(pc_results)} 통과\n")
 
         print("[Mobile] 테스트 시작...")
         print("-" * 50)
-        mob_results = run_platform(playwright, cfg, mobile=True)
+        mob_results = run_platform(playwright, cfg, mobile=True, headless=headless)
         all_results += mob_results
         mob_pass = sum(1 for r in mob_results if r.passed)
         print(f"Mobile 완료: {mob_pass}/{len(mob_results)} 통과\n")
@@ -146,6 +145,7 @@ def cleanup_old_files(base_dir: str, days: int = 7):
 
 
 def main():
+    headless = "--show" not in sys.argv
     start = time.time()
     print("\n" + "=" * 60)
     print(f"🚀 드림몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")
@@ -161,7 +161,7 @@ def main():
     cleanup_old_files(os.path.join(base_dir, "videos"))
 
     cfg = load_config()
-    results = run_all(cfg)
+    results = run_all(cfg, headless=headless)
     elapsed = time.time() - start
 
     # 결과 요약
@@ -186,12 +186,12 @@ def main():
     print(f"\n📄 리포트 저장: {report_path}")
 
     # 두레이 발송 (간단한 요약 메시지)
-    webhook_url = cfg["dooray"]["webhook_url"]
-    bot_name = cfg["dooray"]["bot_name"]
-    if webhook_url:
-        simple_msg = build_simple_message(results)
-        ok = dooray_send(webhook_url, bot_name, simple_msg)
-        print(f"💬 두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
+    # webhook_url = cfg["dooray"]["webhook_url"]
+    # bot_name = cfg["dooray"]["bot_name"]
+    # if webhook_url:
+    #     simple_msg = build_simple_message(results)
+    #     ok = dooray_send(webhook_url, bot_name, simple_msg)
+    #     print(f"💬 두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
 
     sys.exit(1 if fail_count > 0 else 0)
 
