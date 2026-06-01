@@ -1,0 +1,48 @@
+﻿# config.yaml.example
+# 이 파일을 복사해서 config.yaml 로 이름을 바꾼 뒤 실제 값을 입력하세요.
+# config.yaml 은 .gitignore 에 포함되어 있으므로 Git에 올라가지 않습니다.
+
+urls:
+  pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
+  mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
+
+account:
+  username: "YOUR_ID"        # 테스트 계정 ID (장바구니·배송지 테스트용, 없으면 두 항목 스킵)
+  password: "YOUR_PASSWORD"  # 테스트 계정 비밀번호
+
+search:
+  valid:
+    - 생수
+    - 수건
+    - 물
+    - 닭가슴살
+    - 텀블러
+    - 이어폰
+    - 휴대폰
+    - 신발
+    - 핸드폰
+    - 게임
+    - 옷
+    - 크림
+    - 우산
+    - 백팩
+    - 충전기
+    - 노트북
+    - 노이즈 캔슬링
+    - 치약
+
+categories:
+  pool:
+    - 가전/디지털
+    - 식품
+    - 뷰티
+    - 생활/건강
+    - 가구/인테리어
+    - 스포츠/레저/자동차
+    - 잡화
+    - 문구/취미/펫
+  count: 5
+
+dooray:
+  webhook_url: "YOUR_DOORAY_WEBHOOK_URL"  # 두레이 웹훅 URL (미사용 시 빈 문자열)
+  bot_name: "드림몰 테스트봇"
