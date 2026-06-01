@@ -1,6 +1,8 @@
 ﻿# pobanuri UI 자동화 테스트
 
-Playwright 기반의 드림몰(dream.onuri.co.kr) UI 자동화 테스트 도구입니다. PC와 모바일 환경을 동시에 검증하며, 테스트 결과를 스크린샷·영상·마크다운 리포트로 저장합니다.
+Playwright 기반의 드림몰(dream.onuri.co.kr) UI 자동화 테스트 도구입니다. 
+PC와 모바일 환경을 동시에 검증하며, 테스트 결과를 스크린샷·영상·마크다운 리포트로 저장합니다.
+
 
 ---
 
@@ -71,20 +73,30 @@ playwright install chromium
 
 ## 설정
 
-`config.yaml`은 `.gitignore`에 포함되어 있어 Git에 올라가지 않습니다.  
-`config.yaml.example`을 복사해 `config.yaml`로 이름을 바꾼 뒤 실제 값을 입력하세요.
+`config.yaml` 파일에서 모든 테스트 설정을 관리합니다.
 
-```bash
-cp config.yaml.example config.yaml
+```yaml
+urls:
+  pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
+  mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
+
+account:
+  username: "아이디"    # 장바구니·배송지 테스트에 사용 (없으면 두 항목 스킵)
+  password: "비밀번호"
+
+search:
+  valid:                # 검색 테스트용 유효 키워드 풀 (매 실행마다 3개 무작위 선택)
+    - 생수
+    - 수건
+    # ...
+
+categories:
+  pool:                 # 카테고리 테스트 대상 풀
+    - 가전/디지털
+    - 식품
+    # ...
+  count: 5              # 풀에서 무작위로 선택할 카테고리 수
 ```
-
-| 항목 | 설명 |
-|------|------|
-| `urls.pc` / `urls.mobile` | PC·모바일 테스트 대상 URL |
-| `account.username` / `password` | 장바구니·배송지 테스트용 계정 (없으면 두 항목 스킵) |
-| `search.valid` | 검색 테스트 키워드 풀 (매 실행 시 3개 무작위 선택) |
-| `categories.pool` / `count` | 카테고리 테스트 대상 풀 및 무작위 선택 수 |
-| `dooray.webhook_url` | 두레이 웹훅 URL (현재 코드에서 주석 처리됨) |
 
 ---
 
@@ -120,11 +132,13 @@ PC 완료: 8/8 통과
 
 ### Windows 작업 스케줄러로 자동 실행
 
-아래 명령을 작업 스케줄러의 동작(Action) 항목에 등록합니다.
+현재 매일 **09:00**, **17:00** (KST) 두 차례 자동 실행되도록 예약되어 있습니다.
+
+새로 등록하려면 작업 스케줄러의 동작(Action) 항목에 아래와 같이 입력합니다.
 
 ```
 프로그램: python
-인수: C:\경로\UI_test\main.py
+인수:     C:\경로\UI_test\main.py
 시작 위치: C:\경로\UI_test
 ```
 
@@ -138,8 +152,7 @@ PC 완료: 8/8 통과
 | `videos/` | 팝업 테스트 영상 (WebM 형식) |
 | `reports/` | 마크다운 형식 리포트. 파일명: `report_YYYYMMDD_HHMMSS.md` |
 
-> 7일 이상 지난 파일은 다음 실행 시 자동 삭제됩니다.  
-> `screenshots/`, `videos/`, `reports/` 폴더는 `.gitignore`에 포함되어 Git에 올라가지 않습니다.
+> 7일 이상 지난 파일은 다음 실행 시 자동 삭제됩니다.
 
 ---
 
@@ -147,24 +160,23 @@ PC 완료: 8/8 통과
 
 ```
 UI_test/
-├── main.py               # 진입점: 설정 로드, PC/Mobile 순차 실행, 리포트 저장
-├── config.yaml           # 실제 설정 파일 (.gitignore 제외)
-├── config.yaml.example   # 설정 템플릿 (Git 공개)
-├── requirements.txt      # Python 의존성
+├── main.py              # 진입점: 설정 로드, PC/Mobile 순차 실행, 리포트 저장
+├── config.yaml          # URL, 계정, 검색 키워드, 카테고리 설정
+├── requirements.txt     # Python 의존성
 ├── tests/
-│   ├── base.py           # 공통 유틸: 브라우저 초기화, 팝업 닫기, 로그인, 스크린샷
-│   ├── test_main.py      # 메인 화면 진입
-│   ├── test_popup.py     # 메인 팝업 노출 및 링크 검증
-│   ├── test_search.py    # 검색 기능
-│   ├── test_category.py  # 카테고리 메뉴 진입 및 상품 노출
-│   ├── test_gnb.py       # GNB 전체 메뉴 진입
-│   ├── test_popular.py   # 하단 인기상품 목록
-│   ├── test_cart.py      # 장바구니 담기 및 주문하기
-│   └── test_shipping.py  # 배송지 등록 양식
+│   ├── base.py          # 공통 유틸: 브라우저 초기화, 팝업 닫기, 로그인, 스크린샷
+│   ├── test_main.py     # 메인 화면 진입
+│   ├── test_popup.py    # 메인 팝업 노출 및 링크 검증
+│   ├── test_search.py   # 검색 기능
+│   ├── test_category.py # 카테고리 메뉴 진입 및 상품 노출
+│   ├── test_gnb.py      # GNB 전체 메뉴 진입
+│   ├── test_popular.py  # 하단 인기상품 목록
+│   ├── test_cart.py     # 장바구니 담기 및 주문하기
+│   └── test_shipping.py # 배송지 등록 양식
 ├── report/
-│   ├── generator.py      # 마크다운 리포트 생성
-│   └── dooray.py         # 두레이 웹훅 발송 (현재 주석 처리)
-├── screenshots/          # 스크린샷 저장 (.gitignore 제외)
-├── videos/               # 영상 저장 (.gitignore 제외)
-└── reports/              # 마크다운 리포트 저장 (.gitignore 제외)
+│   ├── generator.py     # 마크다운 리포트 생성
+│   └── dooray.py        # 두레이 웹훅 발송 (현재 주석 처리)
+├── screenshots/         # 스크린샷 저장 디렉터리
+├── videos/              # 영상 저장 디렉터리
+└── reports/             # 마크다운 리포트 저장 디렉터리
 ```
