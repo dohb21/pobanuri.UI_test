@@ -1,14 +1,6 @@
-﻿# config.yaml.example
-# 이 파일을 복사해서 config.yaml 로 이름을 바꾼 뒤 실제 값을 입력하세요.
-# config.yaml 은 .gitignore 에 포함되어 있으므로 Git에 올라가지 않습니다.
-
 urls:
   pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
   mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
-
-account:
-  username: "YOUR_ID"        # 테스트 계정 ID (장바구니·배송지 테스트용, 없으면 두 항목 스킵)
-  password: "YOUR_PASSWORD"  # 테스트 계정 비밀번호
 
 search:
   valid:
@@ -44,5 +36,4 @@ categories:
   count: 5
 
 dooray:
-  webhook_url: "YOUR_DOORAY_WEBHOOK_URL"  # 두레이 웹훅 URL (미사용 시 빈 문자열)
   bot_name: "드림몰 테스트봇"

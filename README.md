@@ -53,7 +53,7 @@ PC와 Mobile 각각 아래 8개 시나리오를 순서대로 실행합니다.
 | 7 | **장바구니 담기** | `test_cart.py` | 로그인 → 사전 장바구니 비우기 → 인기상품 "장바구니 담기" 클릭 → 옵션 선택 → 장바구니 항목 수 증가 확인 → "주문하기" 클릭 → 결제 페이지 이동 확인 → 사후 비우기 |
 | 8 | **배송지 등록 양식** | `test_shipping.py` | 로그인 → 배송지 관리 페이지 진입 → "배송지 추가" 클릭 → 팝업 폼 필드(이름·전화·우편번호·주소) 입력 가능 여부 확인 |
 
-> 7·8번은 `config.yaml`에 계정 정보가 있을 때만 실행됩니다.
+> 7·8번은 `.env`의 `ACCOUNT_USERNAME`이 설정된 경우에만 실행됩니다.
 
 ---
 
@@ -73,16 +73,14 @@ playwright install chromium
 
 ## 설정
 
-`config.yaml` 파일에서 모든 테스트 설정을 관리합니다.
+설정은 `config.yaml`(테스트 동작)과 `.env`(민감 정보) 두 파일로 분리 관리합니다.
+
+### config.yaml — 테스트 동작 설정
 
 ```yaml
 urls:
   pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
   mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
-
-account:
-  username: "아이디"    # 장바구니·배송지 테스트에 사용 (없으면 두 항목 스킵)
-  password: "비밀번호"
 
 search:
   valid:                # 검색 테스트용 유효 키워드 풀 (매 실행마다 3개 무작위 선택)
@@ -96,7 +94,20 @@ categories:
     - 식품
     # ...
   count: 5              # 풀에서 무작위로 선택할 카테고리 수
+
+dooray:
+  bot_name: "드림몰 테스트봇"
 ```
+
+### .env — 민감 정보 (git 제외)
+
+```env
+ACCOUNT_USERNAME=아이디       # 장바구니·배송지 테스트에 사용 (없으면 두 항목 스킵)
+ACCOUNT_PASSWORD=비밀번호
+DOORAY_WEBHOOK_URL=https://...
+```
+
+> GitHub Actions에서는 `.env` 대신 Repository Secrets(`username`, `password`, `WEBHOOK_URL`)로 관리합니다.
 
 ---
 
@@ -130,17 +141,18 @@ PC 완료: 8/8 통과
 
 테스트 실패 항목이 하나라도 있으면 종료 코드 `1`로 종료합니다 (CI 연동 가능).
 
-### Windows 작업 스케줄러로 자동 실행
+### GitHub Actions 자동 실행
 
-현재 매일 **09:00**, **17:00** (KST) 두 차례 자동 실행되도록 예약되어 있습니다.
+매일 **08:38**, **14:38** (KST) 두 차례 자동 실행됩니다.
+수동 실행은 GitHub 저장소의 **Actions → 9-17 scheduler → Run workflow**에서 트리거할 수 있습니다.
 
-새로 등록하려면 작업 스케줄러의 동작(Action) 항목에 아래와 같이 입력합니다.
+Repository Secrets에 아래 세 항목이 등록되어 있어야 합니다.
 
-```
-프로그램: python
-인수:     C:\경로\UI_test\main.py
-시작 위치: C:\경로\UI_test
-```
+| Secret 이름 | 설명 |
+|-------------|------|
+| `username` | 테스트 계정 아이디 |
+| `password` | 테스트 계정 비밀번호 |
+| `WEBHOOK_URL` | 두레이 웹훅 URL |
 
 ---
 
@@ -161,7 +173,8 @@ PC 완료: 8/8 통과
 ```
 UI_test/
 ├── main.py              # 진입점: 설정 로드, PC/Mobile 순차 실행, 리포트 저장
-├── config.yaml          # URL, 계정, 검색 키워드, 카테고리 설정
+├── config.yaml          # URL, 검색 키워드, 카테고리, 두레이 봇 이름 설정
+├── .env                 # 계정 정보·웹훅 URL (git 제외, 로컬 전용)
 ├── requirements.txt     # Python 의존성
 ├── tests/
 │   ├── base.py          # 공통 유틸: 브라우저 초기화, 팝업 닫기, 로그인, 스크린샷
@@ -175,7 +188,7 @@ UI_test/
 │   └── test_shipping.py # 배송지 등록 양식
 ├── report/
 │   ├── generator.py     # 마크다운 리포트 생성
-│   └── dooray.py        # 두레이 웹훅 발송 (현재 주석 처리)
+│   └── dooray.py        # 두레이 웹훅 발송
 ├── screenshots/         # 스크린샷 저장 디렉터리
 ├── videos/              # 영상 저장 디렉터리
 └── reports/             # 마크다운 리포트 저장 디렉터리

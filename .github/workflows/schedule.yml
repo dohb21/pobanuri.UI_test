@@ -33,6 +33,10 @@ jobs:
           playwright install chromium
 
       - name: Run main.py
+        env:
+          ACCOUNT_USERNAME: ${{ secrets.username }}
+          ACCOUNT_PASSWORD: ${{ secrets.password }}
+          DOORAY_WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
           python main.py
 
