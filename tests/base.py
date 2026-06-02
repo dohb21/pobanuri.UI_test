@@ -78,10 +78,21 @@ def _find_chromium() -> str | None:
     return None
 
 
+_DESKTOP_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
+
 def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True):
     launch_kwargs = {
         "headless": headless,
-        "args": ["--disable-gpu", "--no-sandbox"],
+        "args": [
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-blink-features=AutomationControlled",
+        ],
     }
     chromium_exe = _find_chromium()
     if chromium_exe:
@@ -99,8 +110,13 @@ def init_browser(playwright: Playwright, mobile: bool = False, record_video: boo
         device = playwright.devices["Galaxy S5"]
         context = browser.new_context(**device, **context_args)
     else:
-        context = browser.new_context(viewport={"width": 1280, "height": 800}, **context_args)
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            user_agent=_DESKTOP_UA,
+            **context_args,
+        )
     page = context.new_page()
+    page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     page.set_default_timeout(15000)
     return browser, context, page
 
