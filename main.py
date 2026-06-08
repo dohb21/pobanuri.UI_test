@@ -190,12 +190,12 @@ def main():
     print(f"\n리포트 저장: {report_path}")
 
     # 두레이 발송 (간단한 요약 메시지)
-    # webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
-    # bot_name = cfg["dooray"]["bot_name"]
-    # if webhook_url:
-    #     simple_msg = build_simple_message(results)
-    #     ok = dooray_send(webhook_url, bot_name, simple_msg)
-    #     print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
+    webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
+    bot_name = cfg["dooray"]["bot_name"]
+    if webhook_url:
+        simple_msg = build_simple_message(results)
+        ok = dooray_send(webhook_url, bot_name, simple_msg)
+        print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
 
     sys.exit(1 if fail_count > 0 else 0)
 
