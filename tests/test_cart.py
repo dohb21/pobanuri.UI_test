@@ -425,28 +425,59 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
 
 def _select_all_cart_items(page: Page):
     """장바구니 전체선택 체크박스 체크."""
+    # 스토어별 상품 체크박스 (id^='up_comp_no_checkbox')
     for sel in [
+        "input[type='checkbox'][id^='up_comp_no_checkbox']",
         "input[type='checkbox'][id*='all']",
         "input[type='checkbox'][id*='All']",
         "input[type='checkbox'][class*='all']",
         "input[type='checkbox'][name*='all']",
     ]:
         try:
-            chk = page.locator(sel).first
-            if chk.count() > 0 and chk.is_visible(timeout=800):
-                if not chk.is_checked():
-                    try:
-                        chk.check(timeout=1500)
-                    except Exception:
-                        chk.evaluate(
-                            "el => { el.checked = true;"
-                            " el.dispatchEvent(new Event('click', {bubbles:true})); }"
-                        )
-                print(f"  [주문하기] 전체선택 체크 완료 ({sel})")
+            boxes = page.locator(sel).all()
+            if not boxes:
+                continue
+            checked_any = False
+            for chk in boxes:
+                try:
+                    if chk.is_visible(timeout=500):
+                        if not chk.is_checked():
+                            try:
+                                chk.check(timeout=1500)
+                            except Exception:
+                                chk.evaluate(
+                                    "el => { el.checked = true;"
+                                    " el.dispatchEvent(new Event('click', {bubbles:true})); }"
+                                )
+                        checked_any = True
+                except Exception:
+                    continue
+            if checked_any:
+                print(f"  [주문하기] 전체선택 체크 완료 ({sel}, {len(boxes)}개)")
                 time.sleep(0.3)
                 return
         except Exception:
             continue
+    # 폴백: JavaScript로 모든 체크박스 강제 체크
+    try:
+        checked = page.evaluate("""() => {
+            const boxes = document.querySelectorAll('input[type="checkbox"]');
+            let cnt = 0;
+            boxes.forEach(cb => {
+                if (!cb.checked) {
+                    cb.checked = true;
+                    cb.dispatchEvent(new Event('change', {bubbles: true}));
+                    cb.dispatchEvent(new Event('click', {bubbles: true}));
+                }
+                cnt++;
+            });
+            return cnt;
+        }""")
+        if checked:
+            print(f"  [주문하기] 전체선택 JS 폴백으로 체크박스 {checked}개 처리")
+            time.sleep(0.3)
+    except Exception:
+        pass
 
 
 def _click_order_btn(page: Page) -> bool:

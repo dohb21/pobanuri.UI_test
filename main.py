@@ -7,7 +7,7 @@ import random
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -28,8 +28,8 @@ def load_config() -> dict:
 def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> list[TestResult]:
     platform = "Mobile" if mobile else "PC"
     url = cfg["urls"]["mobile"] if mobile else cfg["urls"]["pc"]
-    username = os.environ.get("ACCOUNT_USERNAME", "")
-    password = os.environ.get("ACCOUNT_PASSWORD", "")
+    username = os.environ.get("ID", "")
+    password = os.environ.get("PASSWORD", "")
     valid_kws = cfg["search"]["valid"]
     cat_pool = cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
@@ -190,12 +190,12 @@ def main():
     print(f"\n리포트 저장: {report_path}")
 
     # 두레이 발송 (간단한 요약 메시지)
-    webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
-    bot_name = cfg["dooray"]["bot_name"]
-    if webhook_url:
-        simple_msg = build_simple_message(results)
-        ok = dooray_send(webhook_url, bot_name, simple_msg)
-        print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
+    # webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
+    # bot_name = cfg["dooray"]["bot_name"]
+    # if webhook_url:
+    #     simple_msg = build_simple_message(results)
+    #     ok = dooray_send(webhook_url, bot_name, simple_msg)
+    #     print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
 
     sys.exit(1 if fail_count > 0 else 0)
 
