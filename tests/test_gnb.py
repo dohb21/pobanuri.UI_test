@@ -4,7 +4,6 @@ from playwright.sync_api import Page
 from .base import close_popups, login
 
 
-# 클릭 후 모달/오버레이 감지용 선택자
 MODAL_SELECTORS = [
     "[class*='layerCategory']", "[class*='layer-category']",
     "[class*='categoryLayer']", "[class*='category-layer']",
@@ -18,6 +17,15 @@ MODAL_SELECTORS = [
     "div[class*='modal']:not([style*='display: none'])",
     "div[class*='dimmed']:not([style*='display: none'])",
 ]
+
+MODAL_WAIT_SELECTOR = ", ".join([
+    "[class*='layerCategory']",
+    "[class*='categoryLayer']",
+    "[class*='exhibition']",
+    "[class*='installment']",
+    "div[class*='layer'][style*='display: block']",
+    "div[class*='popup'][style*='display: block']",
+])
 
 
 def _get_pc_gnb_items(page: Page) -> list[dict]:
@@ -57,7 +65,6 @@ def _get_mobile_gnb_items(page: Page) -> list[dict]:
 
 
 def _get_item_el(page: Page, item: dict, is_mobile: bool):
-    """항목 요소를 페이지에서 새로 탐색해 반환 (stale 방지)"""
     if is_mobile:
         gnb_ul = page.locator("ul.swiper-wrapper:has(li.swiper-slide > a[href='/main'])").first
         return gnb_ul.locator("li.swiper-slide").nth(item["idx"]).locator("a").first
@@ -66,7 +73,6 @@ def _get_item_el(page: Page, item: dict, is_mobile: bool):
 
 
 def _extract_exhibition_id(href: str) -> str | None:
-    """javascript:openGnbExhibitionDetail(13342) → '13342'"""
     m = re.search(r'openGnbExhibitionDetail\((\d+)\)', href or "")
     return m.group(1) if m else None
 
@@ -79,10 +85,8 @@ def _is_installment(item: dict) -> bool:
 
 
 def _close_any_modal(page: Page):
-    """열린 모달/레이어를 ESC 또는 닫기 버튼으로 닫기"""
     try:
         page.keyboard.press("Escape")
-        time.sleep(0.3)
     except Exception:
         pass
     close_popups(page)
@@ -95,7 +99,6 @@ def _modal_is_open(page: Page) -> bool:
                 return True
         except Exception:
             pass
-    # JS 폴백: z-index가 높은 visible 오버레이 요소 탐지
     try:
         return bool(page.evaluate("""() => {
             return Array.from(document.querySelectorAll('div,section,aside')).some(el => {
@@ -113,14 +116,12 @@ def _modal_is_open(page: Page) -> bool:
 
 
 def _do_login(page: Page, url: str, username: str, password: str) -> bool:
-    """로그인 후 target으로 재이동. 성공 시 True."""
     return login(page, url, username, password)
 
 
 def _test_regular_link(
     page: Page, item: dict, base: str, url: str, username: str, password: str
 ) -> tuple[bool, str]:
-    """일반 href 링크: 이동 → 로그인 필요 시 로그인 → URL 검증"""
     href = item["href"]
     target = href if href.startswith("http") else base + href
     path_key = href.split("?")[0].rstrip("/").split("/")[-1]
@@ -128,18 +129,14 @@ def _test_regular_link(
     try:
         page.goto(target, wait_until="domcontentloaded", timeout=15000)
         close_popups(page)
-        time.sleep(0.5)
 
         if "login" in page.url.lower():
             if not username:
                 return False, "로그인 필요 (계정 없음)"
             if not _do_login(page, url, username, password):
                 return False, "로그인 실패"
-            time.sleep(0.5)
-            # 로그인 후 대상 페이지로 재이동
             page.goto(target, wait_until="domcontentloaded", timeout=15000)
             close_popups(page)
-            time.sleep(0.5)
 
         cur = page.url
         if href == "/main" or not path_key or path_key in cur:
@@ -152,7 +149,6 @@ def _test_regular_link(
 def _test_exhibition_link(
     page: Page, item: dict, base: str, url: str, username: str, password: str
 ) -> tuple[bool, str]:
-    """javascript:openGnbExhibitionDetail(id) → /event/indexExhibitionDetail?exhbtNo=id"""
     exhbt_id = _extract_exhibition_id(item["href"])
     if not exhbt_id:
         return False, "기획전 ID 추출 실패"
@@ -161,17 +157,14 @@ def _test_exhibition_link(
     try:
         page.goto(target, wait_until="domcontentloaded", timeout=15000)
         close_popups(page)
-        time.sleep(0.5)
 
         if "login" in page.url.lower():
             if not username:
                 return False, "로그인 필요 (계정 없음)"
             if not _do_login(page, url, username, password):
                 return False, "로그인 실패"
-            time.sleep(0.5)
             page.goto(target, wait_until="domcontentloaded", timeout=15000)
             close_popups(page)
-            time.sleep(0.5)
 
         cur = page.url
         ok = "indexExhibitionDetail" in cur
@@ -181,7 +174,6 @@ def _test_exhibition_link(
 
 
 def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tuple[bool, str]:
-    """JS 링크 클릭 → URL 변경 또는 모달 열림 확인"""
     try:
         el = _get_item_el(page, item, is_mobile)
         try:
@@ -189,7 +181,12 @@ def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tu
         except Exception:
             pass
         el.click(timeout=5000, force=is_mobile)
-        time.sleep(1.5)
+
+        # 모달 오픈 또는 URL 변경 대기 (최대 2.5초)
+        try:
+            page.wait_for_selector(MODAL_WAIT_SELECTOR, timeout=2500)
+        except Exception:
+            pass
 
         cur = page.url
         if cur != start_url:
@@ -204,13 +201,12 @@ def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tu
         return False, str(e)[:80]
 
 
-def run(page: Page, url: str, username: str = "", password: str = "") -> str:
-    base = url.split("/main")[0]
-    is_mobile = "mdream" in url or "/m." in url
+def run(page: Page, url: str, username: str = "", password: str = "", mobile: bool = False) -> str:
+    base = url.split("/main")[0].rstrip("/")
+    is_mobile = mobile
 
     page.goto(url, wait_until="domcontentloaded", timeout=20000)
     close_popups(page)
-    time.sleep(1)
 
     items = _get_mobile_gnb_items(page) if is_mobile else _get_pc_gnb_items(page)
 
@@ -221,15 +217,17 @@ def run(page: Page, url: str, username: str = "", password: str = "") -> str:
     if not items:
         raise AssertionError("GNB 메뉴 항목을 찾을 수 없음")
 
+    # 카테고리 항목은 test_category.py에서 별도 검증하므로 스킵
+    SKIP_TEXTS = {"카테고리", "전체카테고리", "카테고리전체"}
+    items = [it for it in items if it["text"] not in SKIP_TEXTS]
+
     results = []
     for i, item in enumerate(items):
-        # 각 테스트 전 메인 복귀 및 모달 닫기
         try:
             _close_any_modal(page)
             if page.url != url:
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 close_popups(page)
-                time.sleep(0.5)
         except Exception:
             pass
 
@@ -238,19 +236,15 @@ def run(page: Page, url: str, username: str = "", password: str = "") -> str:
         is_js = not href or href.startswith("javascript:") or href == "#"
 
         if exhbt_id:
-            # javascript:openGnbExhibitionDetail(id) → 직접 URL 구성 후 진입
             ok, note = _test_exhibition_link(page, item, base, url, username, password)
             _close_any_modal(page)
         elif _is_installment(item):
-            # popupInstallment(): 클릭 → 모달 감지
             ok, note = _test_js_link(page, item, is_mobile, page.url)
             _close_any_modal(page)
         elif is_js:
-            # 기타 JS 링크 (categoryOpen 등): 클릭 → 모달 감지
             ok, note = _test_js_link(page, item, is_mobile, page.url)
             _close_any_modal(page)
         else:
-            # 일반 href: 이동 → 로그인 필요 시 로그인 → URL 검증
             ok, note = _test_regular_link(page, item, base, url, username, password)
 
         status = "✅" if ok else "❌"

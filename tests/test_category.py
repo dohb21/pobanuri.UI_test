@@ -9,32 +9,35 @@ def _open_and_click_category_pc(page: Page, category: str) -> bool:
     try:
         page.evaluate("categoryOpen()")
         page.wait_for_selector(".category-box.on", timeout=5000)
-        time.sleep(0.5)
 
-        # 대분류(depth1) 클릭
         cat_link = page.locator("#category_depth1 ul.group").get_by_text(category, exact=True)
         if cat_link.count() == 0:
             cat_link = page.locator(".category-box").get_by_text(category, exact=True)
+        # 정확 일치 실패 시 첫 세그먼트로 부분 일치 시도 (예: '스포츠/레저/자동차' → '스포츠')
+        if cat_link.count() == 0:
+            short = category.split("/")[0]
+            cat_link = page.locator(".category-box").filter(has_text=short)
         cat_link.first.click(timeout=5000)
-        time.sleep(0.8)
 
-        # 중분류(depth2) 첫 항목 클릭 → 상품 목록 페이지로 이동
+        # 중분류(depth2) 나타날 때까지 대기
         for d2_sel in [
             "#category_depth2 a",
             ".category-depth2 a",
             "[id*='depth2'] a",
             "[class*='depth2'] a",
             ".category-box .right a",
+            "li[class*='lvl-02']",
+            "li[class*='category-lvl-02']",
         ]:
             try:
+                page.wait_for_selector(d2_sel, timeout=3000)
                 d2 = page.locator(d2_sel).first
-                if d2.is_visible(timeout=2000):
+                if d2.is_visible(timeout=1000):
                     d2.click(timeout=3000)
                     try:
                         page.wait_for_load_state("domcontentloaded", timeout=8000)
                     except Exception:
                         pass
-                    time.sleep(1)
                     return True
             except Exception:
                 continue
@@ -47,9 +50,6 @@ def _open_and_click_category_pc(page: Page, category: str) -> bool:
 def _open_and_click_category_mobile(page: Page, category: str) -> bool:
     """
     Mobile: fn_totalMenuToggle() 아이콘 클릭 → 대분류 클릭 → 중분류 첫 항목 클릭
-    실제 HTML: <img onclick="javascript:fn_totalMenuToggle();">
-               <a href="javascript:void(0)">가구/인테리어</a>
-               <a href="javascript:void(0)">DIY자재/용품</a>
     """
     try:
         # 1. 전체 메뉴 열기
@@ -58,12 +58,23 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
             "[onclick*='fn_totalMenuToggle']",
             "img[onclick*='fn_totalMenuToggle']",
             "button[onclick*='fn_totalMenuToggle']",
+            "[class*='btnAllMenu']",
+            "[class*='btn-all-menu']",
+            "[class*='btn_all']",
+            "button[class*='menu']",
         ]:
             try:
                 el = page.locator(sel).first
                 if el.count() > 0:
                     el.evaluate("el => el.click()")
-                    time.sleep(1)
+                    try:
+                        page.wait_for_selector(
+                            "[class*='totalMenu'], [class*='total-menu'], [class*='allMenu'], "
+                            "[class*='all-menu'], [class*='gnbAll'], [class*='sideMenu']",
+                            timeout=3000
+                        )
+                    except Exception:
+                        time.sleep(0.5)
                     menu_opened = True
                     break
             except Exception:
@@ -72,24 +83,78 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
         if not menu_opened:
             return False
 
-        # 2. 대분류(depth1) 클릭 – href="javascript:void(0)" 링크
+        # 메뉴 링크가 렌더링될 때까지 대기
+        try:
+            page.wait_for_function("() => document.querySelectorAll('a').length > 5", timeout=2000)
+        except Exception:
+            pass
+
+        # 2. 대분류(depth1) 클릭 — 정확 일치 우선, 없으면 포함 일치
         d1_found = False
-        for d1 in page.locator("a").all():
+        all_links = page.locator("a").all()
+
+        def _normalize(text: str) -> str:
+            return " ".join(text.split())  # 탭·줄바꿈·다중공백 정규화
+
+        def _click_el(el):
+            """모바일 tap 우선, 실패 시 evaluate click"""
             try:
-                if d1.is_visible(timeout=300) and d1.inner_text(timeout=200).strip() == category:
-                    d1.evaluate("el => el.click()")
+                el.tap(timeout=2000)
+            except Exception:
+                el.evaluate("el => el.click()")
+
+        # 정확 일치
+        for d1 in all_links:
+            try:
+                if not d1.is_visible(timeout=300):
+                    continue
+                text = _normalize(d1.inner_text(timeout=200))
+                if text == category:
+                    _click_el(d1)
                     d1_found = True
-                    time.sleep(0.8)
                     break
             except Exception:
                 continue
 
+        # 포함 일치 (예: '문구/취미/펫' → '문구/취미')
+        if not d1_found:
+            cat_short = category.split("/")[0]  # 첫 번째 슬래시 이전
+            for d1 in all_links:
+                try:
+                    if not d1.is_visible(timeout=200):
+                        continue
+                    text = _normalize(d1.inner_text(timeout=200))
+                    if cat_short and cat_short in text and len(text) < 30:
+                        _click_el(d1)
+                        d1_found = True
+                        break
+                except Exception:
+                    continue
+
         if not d1_found:
             return False
 
-        # 3. 중분류(depth2) 첫 항목 클릭 – depth1 클릭 후 새로 나타난 링크
-        # 여러 선택자 시도
+        # 3. 클릭 후 URL 변경(페이지 이동) 또는 중분류 노출 대기
+        try:
+            page.wait_for_function(
+                "() => location.href.includes('indexCategory') || location.href.includes('/category')",
+                timeout=3000,
+            )
+            # 직접 카테고리 페이지로 이동
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=8000)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            pass
+
+        # 중분류(depth2) 나타날 때까지 대기 후 클릭
+        # poba/samaint/thek: <li class="dev-category-lvl-02" dispclsfno="..."> 구조
         for d2_sel in [
+            "li[class*='lvl-02']",
+            "li[class*='category-lvl']",
+            "[class*='depth2'] li",
             "[class*='depth2'] a",
             "[class*='sub'] a",
             "ul.sub-list a",
@@ -98,20 +163,18 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
             "li.active > ul a",
         ]:
             try:
+                page.wait_for_selector(d2_sel, timeout=2000)
                 d2 = page.locator(d2_sel).first
-                if d2.is_visible(timeout=1500):
-                    d2.evaluate("el => el.click()")
+                if d2.is_visible(timeout=1000):
+                    _click_el(d2)
                     try:
                         page.wait_for_load_state("domcontentloaded", timeout=8000)
                     except Exception:
                         pass
-                    time.sleep(1)
                     return True
             except Exception:
                 continue
 
-        # depth2 선택자를 못 찾으면: depth1 클릭이 이미 페이지 이동을 했거나
-        # depth1 아래에 바로 상품이 있는 구조. URL이 바뀌었으면 성공으로 처리.
         return True
     except Exception:
         return False
@@ -140,7 +203,6 @@ def run(page: Page, url: str, category_pool: list, count: int, mobile: bool = Fa
 
     for cat in chosen:
         try:
-            # 모바일은 domcontentloaded – load 대기 타임아웃 방지
             wait = "domcontentloaded" if mobile else "load"
             page.goto(url, wait_until=wait, timeout=25000)
             close_popups(page)

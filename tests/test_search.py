@@ -15,12 +15,10 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
     1단계: UI 검색 (검색레이어 btn 클릭 → input#searchQuery fill → Enter)
     2단계: URL 직접 이동 (1단계 실패 또는 결과 페이지 미도달 시)
     """
-    # 첫 번째 검색이거나 현재 URL이 검색 결과 페이지가 아니면 메인 페이지로 이동
     if first_search or SEARCH_RESULT_PATH not in page.url:
         page.goto(url, wait_until="domcontentloaded", timeout=20000)
         close_popups(page)
     else:
-        # 이미 검색 결과 페이지면 팝업만 닫기
         try:
             close_popups(page)
         except Exception:
@@ -28,7 +26,6 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
 
     # 1단계: UI 검색 시도
     try:
-        # 검색 레이어 열기 버튼 클릭 (input.dev-header-searchLayer-btn 등)
         for open_sel in [
             "input.dev-header-searchLayer-btn",
             "input.dev-header-lookupLayer-btn",
@@ -38,12 +35,10 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
                 el = page.locator(open_sel).first
                 if el.is_visible(timeout=1500):
                     el.click(timeout=2000)
-                    time.sleep(0.5)
                     break
             except Exception:
                 continue
 
-        # 실제 검색 form 의 input 찾기
         inp = None
         for sel in [
             "input#searchQuery",
@@ -59,7 +54,6 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
                 continue
 
         if inp is not None:
-            # 부모 컨테이너까지 강제 표시
             inp.evaluate("""el => {
                 el.style.cssText = 'display:block !important; visibility:visible !important; opacity:1 !important;';
                 let p = el.parentElement;
@@ -71,47 +65,36 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
                 inp.click(timeout=2000)
             except Exception:
                 inp.evaluate("el => el.focus()")
-            time.sleep(0.3)
             inp.fill(keyword)
-            time.sleep(0.3)
             inp.press("Enter")
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=10000)
             except Exception:
                 pass
-            time.sleep(1.5)
     except Exception:
         pass
 
     # 검색 결과 페이지 미도달 시 URL 직접 이동
     if SEARCH_RESULT_PATH not in page.url:
-        base = url.replace("/main", "")
+        base = url.replace("/main", "").rstrip("/")
         encoded = urllib.parse.quote(keyword)
         search_url = f"{base}{SEARCH_RESULT_PATH}?{SEARCH_HIDDEN_PARAMS}&searchQuery={encoded}"
         page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
-        time.sleep(2)
 
     # AJAX 결과 로드 대기 (#searchUnitList 가 채워질 때까지)
     try:
         page.wait_for_selector("#searchUnitList li", timeout=8000)
     except Exception:
         pass
-    time.sleep(0.5)
 
 
 def _count_results(page: Page) -> int:
-    """
-    유효 검색어용 결과 카운트.
-    PC: #searchUnitList li  |  Mobile: a[href*='indexGoodsDetail?goodsId=']
-    검색 결과 페이지에는 사이드바가 없으므로 링크 카운트 안전.
-    """
     try:
         cnt = page.locator("#searchUnitList li").count()
         if cnt > 0:
             return cnt
     except Exception:
         pass
-    # Mobile fallback (검색결과 페이지에선 사이드바 없음)
     try:
         cnt = page.locator("a[href*='/goods/indexGoodsDetail?goodsId=']").count()
         if cnt > 0:
@@ -122,7 +105,6 @@ def _count_results(page: Page) -> int:
 
 
 def _has_no_result(page: Page) -> bool:
-    """결과없음 메시지 확인"""
     try:
         if "검색 결과가 없" in page.content():
             return True

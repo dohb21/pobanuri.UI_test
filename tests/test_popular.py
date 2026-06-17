@@ -14,9 +14,12 @@ def run(page: Page, url: str) -> str:
     section = page.locator("div.section.sec_6")
     assert section.count() > 0, "인기상품 섹션(div.section.sec_6)을 찾을 수 없음"
 
-    # 섹션으로 스크롤
+    # 섹션으로 스크롤 후 탭/상품 로드 대기
     section.first.scroll_into_view_if_needed()
-    time.sleep(1.5)
+    try:
+        page.wait_for_selector("#categoryMenu li", timeout=5000)
+    except Exception:
+        pass
 
     # 탭 버튼 존재 확인
     tabs = page.locator("#categoryMenu li")

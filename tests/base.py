@@ -107,7 +107,7 @@ def init_browser(playwright: Playwright, mobile: bool = False, record_video: boo
         context_args["record_video_dir"] = videos_dir
 
     if mobile:
-        device = playwright.devices["Galaxy S5"]
+        device = playwright.devices["iPhone 14 Pro Max"]
         context = browser.new_context(**device, **context_args)
     else:
         context = browser.new_context(
@@ -127,16 +127,19 @@ def close_popups(page: Page):
         try:
             buttons = page.locator(sel).all()
             for btn in buttons:
-                if btn.is_visible(timeout=800):
-                    btn.click(timeout=2000)
-                    time.sleep(0.2)
+                if btn.is_visible(timeout=300):
+                    btn.click(timeout=1000)
         except Exception:
             continue
 
 
-def login(page: Page, base_url: str, username: str, password: str) -> bool:
+def login(page: Page, base_url: str, username: str, password: str, login_url: str = "") -> bool:
     """로그인. 성공 시 True."""
-    login_url = base_url.replace("/main", "/indexLogin")
+    if not login_url:
+        login_url = base_url.replace("/main", "/indexLogin")
+        # URL에 /main이 없으면 /indexLogin 경로 직접 붙이기
+        if login_url == base_url:
+            login_url = base_url.rstrip("/") + "/indexLogin"
     try:
         page.goto(login_url, wait_until="load", timeout=20000)
         close_popups(page)
@@ -160,7 +163,6 @@ def login(page: Page, base_url: str, username: str, password: str) -> bool:
         pw_input = page.locator("input[type='password']").first
         id_input.fill(username)
         pw_input.fill(password)
-        time.sleep(0.3)
 
         # fn.login() JS 직접 호출 (onclick 버튼 클릭보다 신뢰도 높음)
         try:

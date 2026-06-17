@@ -4,16 +4,12 @@ from tests.base import TestResult, now_kst
 
 def build_report(results: List[TestResult], elapsed: float) -> str:
     now = now_kst().strftime("%Y-%m-%d %H:%M:%S (KST)")
-    pc_results = [r for r in results if r.platform == "PC"]
-    mob_results = [r for r in results if r.platform == "Mobile"]
-
-    pc_pass = sum(1 for r in pc_results if r.passed)
-    pc_fail = len(pc_results) - pc_pass
-    mob_pass = sum(1 for r in mob_results if r.passed)
-    mob_fail = len(mob_results) - mob_pass
-    total_fail = pc_fail + mob_fail
-
+    total_fail = sum(1 for r in results if not r.passed)
+    total_pass = len(results) - total_fail
     status_icon = "✅ 모두 통과" if total_fail == 0 else f"❌ {total_fail}건 실패"
+
+    # platform 값은 "몰이름 PC" / "몰이름 Mobile" 형태
+    platforms = list(dict.fromkeys(r.platform for r in results))
 
     lines = [
         "# 드림몰 UI 자동 테스트 결과",
@@ -24,15 +20,26 @@ def build_report(results: List[TestResult], elapsed: float) -> str:
         "",
         "## 요약",
         "",
-        "|  | PC | Mobile |",
-        "|--|----|----|",
-        f"| ✅ 통과 | {pc_pass} | {mob_pass} |",
-        f"| ❌ 실패 | {pc_fail} | {mob_fail} |",
-        "",
-        "---",
+        "| 몰 | PC 통과 | PC 실패 | Mobile 통과 | Mobile 실패 |",
+        "|---|---|---|---|---|",
     ]
 
-    for platform, group in [("PC", pc_results), ("Mobile", mob_results)]:
+    mall_names = list(dict.fromkeys(
+        r.platform.rsplit(" ", 1)[0] for r in results
+    ))
+    for mall in mall_names:
+        pc = [r for r in results if r.platform == f"{mall} PC"]
+        mob = [r for r in results if r.platform == f"{mall} Mobile"]
+        pc_pass = sum(1 for r in pc if r.passed)
+        mob_pass = sum(1 for r in mob if r.passed)
+        lines.append(
+            f"| {mall} | {pc_pass}/{len(pc)} | {len(pc)-pc_pass} | {mob_pass}/{len(mob)} | {len(mob)-mob_pass} |"
+        )
+
+    lines += ["", "---"]
+
+    for platform in platforms:
+        group = [r for r in results if r.platform == platform]
         lines += ["", f"## [{platform}] 결과", ""]
         lines += ["| 항목 | 결과 | 비고 |", "|------|------|------|"]
         for r in group:
@@ -63,7 +70,6 @@ def build_simple_message(results: List[TestResult]) -> str:
 
     lines = [
         f"발송시각 : {now}",
-        "사이트 : 드림몰",
         f"ERROR 건수 : {total_fail}건",
     ]
 

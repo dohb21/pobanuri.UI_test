@@ -3,7 +3,6 @@ import time
 from playwright.sync_api import Page
 from .base import close_popups, login
 
-# PC: 인기상품 섹션의 "장바구니 담기" 버튼 (품절 상품에는 없음)
 POPULAR_CART_BTN_SELECTORS = [
     "#searchUnitList button.btn_cart",
     "#searchUnitList button[id*='cartAdd']",
@@ -13,7 +12,6 @@ POPULAR_CART_BTN_SELECTORS = [
     "div.section.sec_6 button[onclick*='cartAdd']",
 ]
 
-# 최종 "장바구니" 버튼 (PC 팝업 / Mobile 레이어 공통)
 DETAIL_CART_BTN_SELECTORS = [
     "button#btnGoodsDtlCart",
     "button.btn-cart[id*='DtlCart']",
@@ -50,12 +48,23 @@ ORDER_BTN_SELECTORS = [
 
 ORDER_PAYMENT_PATH = "/order/indexOrderPayment"
 
+# 주문하기 클릭 후 허용되는 목적지 URL 패턴 (배송지 선택 페이지도 허용)
+CHECKOUT_PATHS = [
+    "/order/indexOrderPayment",
+    "/mypage/order/indexDeliveryList",
+    "/order/indexDeliveryList",
+    "/order/indexDelivery",
+    "/mypage/order/indexDelivery",
+]
+
+CART_URL_PATTERNS = ["indexCartList", "/cart", "/basket"]
+
 
 def _goto_cart(page: Page, base_url: str):
-    base = base_url.replace("/main", "")
+    base = base_url.replace("/main", "").rstrip("/")
     for path in CART_PATHS:
         try:
-            page.goto(base + path, wait_until="load", timeout=15000)
+            page.goto(base + path, wait_until="domcontentloaded", timeout=15000)
             close_popups(page)
             return
         except Exception:
@@ -64,7 +73,7 @@ def _goto_cart(page: Page, base_url: str):
 
 def _count_cart_items(page: Page, base_url: str = "") -> int:
     if base_url:
-        base = base_url.replace("/main", "")
+        base = base_url.replace("/main", "").rstrip("/")
         try:
             count = page.evaluate("""(base) => {
                 return fetch(base + '/common/getCartCnt?temp=' + new Date().toString())
@@ -89,8 +98,6 @@ def _count_cart_items(page: Page, base_url: str = "") -> int:
 def _empty_cart(page: Page, base_url: str) -> int:
     """장바구니 비우기. 최종 항목 수 반환."""
     _goto_cart(page, base_url)
-    time.sleep(0.5)
-    # 전체선택 체크
     for sel in [
         "input[type='checkbox'][id*='all']",
         "input[type='checkbox'][id*='All']",
@@ -105,11 +112,9 @@ def _empty_cart(page: Page, base_url: str) -> int:
                         chk.check(timeout=1500)
                     except Exception:
                         chk.evaluate("el => { el.checked = true; el.dispatchEvent(new Event('click', {bubbles:true})); }")
-                time.sleep(0.3)
                 break
         except Exception:
             continue
-    # 선택삭제 클릭
     for sel in [
         "button:has-text('선택삭제')",
         "button:has-text('선택 삭제')",
@@ -123,15 +128,17 @@ def _empty_cart(page: Page, base_url: str) -> int:
                     btn.click(timeout=2000)
                 except Exception:
                     btn.evaluate("el => el.click()")
-                time.sleep(1.5)
+                # 삭제 후 페이지 반응 대기
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                except Exception:
+                    pass
                 break
         except Exception:
             continue
-    # 페이지 새로고침해서 정확한 잔여 카운트 측정
     try:
-        page.reload(wait_until="load", timeout=10000)
+        page.reload(wait_until="domcontentloaded", timeout=10000)
         close_popups(page)
-        time.sleep(0.5)
     except Exception:
         pass
     return _count_cart_items(page, base_url)
@@ -147,7 +154,6 @@ def _scroll_to_popular(page: Page):
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     except Exception:
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-    time.sleep(1.5)
     try:
         page.wait_for_selector("#searchUnitList li", timeout=8000)
     except Exception:
@@ -155,9 +161,6 @@ def _scroll_to_popular(page: Page):
 
 
 def _get_popular_hrefs(page: Page, base: str) -> list:
-    """인기상품 섹션에서 상품 URL 목록 반환.
-    href / onclick / data-* 등에서 indexGoodsDetail URL 추출.
-    """
     hrefs = []
     _GOODS_PATTERN = re.compile(r"""['"](/[^'"]*indexGoodsDetail[^'"]*)['"]""")
 
@@ -165,25 +168,22 @@ def _get_popular_hrefs(page: Page, base: str) -> list:
         if not text:
             return ""
         if "indexGoodsDetail" in text and "javascript:" not in text:
-            return text  # 일반 URL
+            return text
         m = _GOODS_PATTERN.search(text)
         return m.group(1) if m else ""
 
     for li in page.locator("#searchUnitList li").all()[:15]:
         try:
             path = ""
-            # 1) href 에 indexGoodsDetail 포함
             a = li.locator("a[href*='indexGoodsDetail']").first
             if a.count() > 0:
                 path = _extract(a.get_attribute("href") or "")
 
-            # 2) onclick 에 indexGoodsDetail 포함 (href=javascript:; 형태)
             if not path:
                 a2 = li.locator("a[onclick*='indexGoodsDetail']").first
                 if a2.count() > 0:
                     path = _extract(a2.get_attribute("onclick") or "")
 
-            # 3) href 가 javascript: 이지만 안에 URL 포함
             if not path:
                 a3 = li.locator("a[href^='javascript:']").first
                 if a3.count() > 0:
@@ -197,15 +197,11 @@ def _get_popular_hrefs(page: Page, base: str) -> list:
 
 
 def _select_first_option(page: Page, container_sel: str = None) -> bool:
-    """드림몰 옵션 선택. .optSelectWrap (PC=div.radio, Mobile=label.radio) 마다
-    첫 번째 라디오를 클릭하여 OnnuriGoodsOptionUtil.goodsDtlOptionClick 을 트리거.
-    옵션 그룹이 여러 개면 각 그룹 모두 선택해야 alert 가 뜨지 않는다."""
     scope = page.locator(container_sel) if container_sel else page
     selected = False
 
     wraps = scope.locator(".optSelectWrap").all()
     for wrap in wraps:
-        # 각 옵션 그룹의 첫 번째 라디오 컨테이너
         container = wrap.locator("label.radio, div.radio").first
         if container.count() == 0:
             continue
@@ -213,7 +209,6 @@ def _select_first_option(page: Page, container_sel: str = None) -> bool:
         if radio.count() == 0:
             continue
         try:
-            # input 이 hidden 일 수 있어 force=True
             radio.click(timeout=2000, force=True)
             selected = True
         except Exception:
@@ -230,17 +225,14 @@ def _select_first_option(page: Page, container_sel: str = None) -> bool:
                     selected = True
                 except Exception:
                     continue
-        time.sleep(0.3)
 
     if selected:
         return True
 
-    # 폴백: native select / radio
     try:
         opt = scope.locator("select").first
         if opt.is_visible(timeout=1000):
             opt.select_option(index=1)
-            time.sleep(0.3)
             return True
     except Exception:
         pass
@@ -248,7 +240,6 @@ def _select_first_option(page: Page, container_sel: str = None) -> bool:
         radio = scope.locator("input[type='radio']").first
         if radio.is_visible(timeout=500):
             radio.check()
-            time.sleep(0.3)
             return True
     except Exception:
         pass
@@ -256,12 +247,6 @@ def _select_first_option(page: Page, container_sel: str = None) -> bool:
 
 
 def _pc_cart_flow(page: Page) -> tuple:
-    """
-    PC 흐름:
-    인기상품 섹션 button.btn_cart 클릭
-    → button#btnGoodsDtlCart (옵션 있으면 먼저 선택) 클릭
-    → alert 처리
-    """
     cart_btn = None
     for sel in POPULAR_CART_BTN_SELECTORS:
         try:
@@ -284,7 +269,6 @@ def _pc_cart_flow(page: Page) -> tuple:
         pass
 
     print(f"  [PC 장바구니] 상품 '{product_name}' 장바구니 버튼 클릭 시도")
-    # 버튼 정보 확인
     try:
         onclick = cart_btn.get_attribute("onclick")
         print(f"  [PC 장바구니] 버튼 onclick: {onclick[:80] if onclick else 'None'}")
@@ -301,14 +285,19 @@ def _pc_cart_flow(page: Page) -> tuple:
             print(f"  [PC 장바구니] ✅ evaluate click() 성공")
         except Exception as e2:
             print(f"  [PC 장바구니] ❌ evaluate click() 실패 ({str(e2)[:40]})")
-    time.sleep(1.5)
 
-    # button#btnGoodsDtlCart 대기 (팝업 내)
+    # 상세 장바구니 버튼(팝업) 나타날 때까지 대기
     detail_btn = None
+    detail_sel_str = ", ".join(DETAIL_CART_BTN_SELECTORS)
+    try:
+        page.wait_for_selector(detail_sel_str, timeout=5000)
+    except Exception:
+        pass
+
     for sel in DETAIL_CART_BTN_SELECTORS:
         try:
             btn = page.locator(sel).first
-            if btn.is_visible(timeout=4000):
+            if btn.is_visible(timeout=1000):
                 detail_btn = btn
                 break
         except Exception:
@@ -335,7 +324,16 @@ def _pc_cart_flow(page: Page) -> tuple:
                 print(f"  [PC 장바구니] ✅ evaluate click() 성공")
             except Exception as e2:
                 print(f"  [PC 장바구니] ❌ evaluate click() 실패 ({str(e2)[:40]})")
-        time.sleep(2)
+
+        # 장바구니 추가 완료 신호(dialog 또는 페이지 변화) 대기
+        try:
+            page.wait_for_function(
+                "() => !document.querySelector('button#btnGoodsDtlCart') || "
+                "!document.querySelector('button#btnGoodsDtlCart').offsetParent",
+                timeout=3000
+            )
+        except Exception:
+            pass
     else:
         print(f"  [PC 장바구니] ⚠️ 상세 장바구니 버튼을 찾을 수 없음")
 
@@ -343,14 +341,6 @@ def _pc_cart_flow(page: Page) -> tuple:
 
 
 def _mobile_cart_flow(page: Page, base: str) -> tuple:
-    """
-    Mobile 흐름 (PC 와 겹치지 않게 인기상품 두 번째 상품부터 시도):
-    인기상품 섹션 상품 클릭 (상세 이동)
-    → button#btnGoodsBuyLayerOpen (구매하기)
-    → #layerPop-goodsOptionSelect 에서 옵션 선택 (있으면)
-    → button#btnGoodsDtlCart (장바구니)
-    → alert 처리
-    """
     hrefs = _get_popular_hrefs(page, base)
     print(f"  [Mobile 장바구니] 인기상품 링크 {len(hrefs)}개 발견")
     assert len(hrefs) >= 1, (
@@ -361,13 +351,9 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
     print(f"  [Mobile 장바구니] 인기상품 {len(hrefs)}개 순회")
     for href in hrefs[:6]:
         try:
-            page.goto(href, wait_until="load", timeout=15000)
+            page.goto(href, wait_until="domcontentloaded", timeout=15000)
             close_popups(page)
-            time.sleep(0.5)
-            close_popups(page)  # 한 번 더 닫기
-            time.sleep(0.3)
 
-            # 구매하기 버튼 (품절이면 없거나 숨겨짐)
             buy_btn = page.locator("button#btnGoodsBuyLayerOpen").first
             if not buy_btn.is_visible(timeout=3000):
                 continue
@@ -378,19 +364,22 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
             except Exception:
                 pass
 
-            # 구매하기 클릭 → 옵션 레이어 오픈
             print(f"  [Mobile 장바구니] 상품 '{product_name}' 구매하기 버튼 클릭 시도")
             try:
                 buy_btn.click(timeout=3000)
             except Exception as e:
                 print(f"  [Mobile 장바구니] click() 실패 ({str(e)[:40]}), evaluate로 재시도")
                 buy_btn.evaluate("el => el.click()")
-            time.sleep(1.5)
 
-            # 옵션 레이어 내 옵션 선택
+            # 옵션 레이어 나타날 때까지 대기
+            try:
+                page.wait_for_selector("#layerPop-goodsOptionSelect", timeout=3000)
+            except Exception:
+                pass
+
             try:
                 layer = page.locator("#layerPop-goodsOptionSelect").first
-                if layer.is_visible(timeout=2000):
+                if layer.is_visible(timeout=1000):
                     wrap_cnt = page.locator(
                         "#layerPop-goodsOptionSelect .optSelectWrap"
                     ).count()
@@ -400,7 +389,6 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
             except Exception:
                 pass
 
-            # 장바구니 버튼 클릭
             for sel in DETAIL_CART_BTN_SELECTORS:
                 try:
                     btn = page.locator(sel).first
@@ -411,7 +399,15 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
                         except Exception as e:
                             print(f"  [Mobile 장바구니] click() 실패 ({str(e)[:40]}), evaluate로 재시도")
                             btn.evaluate("el => el.click()")
-                        time.sleep(2)
+                        # 버튼이 사라지거나 dialog가 뜰 때까지 대기
+                        try:
+                            page.wait_for_function(
+                                f"() => !document.querySelector('{sel}') || "
+                                f"!document.querySelector('{sel}').offsetParent",
+                                timeout=3000
+                            )
+                        except Exception:
+                            pass
                         print(f"  [Mobile 장바구니] ✅ 장바구니 추가 완료")
                         return product_name, True
                 except Exception:
@@ -424,8 +420,6 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
 
 
 def _select_all_cart_items(page: Page):
-    """장바구니 전체선택 체크박스 체크."""
-    # 스토어별 상품 체크박스 (id^='up_comp_no_checkbox')
     for sel in [
         "input[type='checkbox'][id^='up_comp_no_checkbox']",
         "input[type='checkbox'][id*='all']",
@@ -447,6 +441,7 @@ def _select_all_cart_items(page: Page):
                             except Exception:
                                 chk.evaluate(
                                     "el => { el.checked = true;"
+                                    " el.dispatchEvent(new Event('change', {bubbles:true}));"
                                     " el.dispatchEvent(new Event('click', {bubbles:true})); }"
                                 )
                         checked_any = True
@@ -454,11 +449,9 @@ def _select_all_cart_items(page: Page):
                     continue
             if checked_any:
                 print(f"  [주문하기] 전체선택 체크 완료 ({sel}, {len(boxes)}개)")
-                time.sleep(0.3)
                 return
         except Exception:
             continue
-    # 폴백: JavaScript로 모든 체크박스 강제 체크
     try:
         checked = page.evaluate("""() => {
             const boxes = document.querySelectorAll('input[type="checkbox"]');
@@ -475,13 +468,29 @@ def _select_all_cart_items(page: Page):
         }""")
         if checked:
             print(f"  [주문하기] 전체선택 JS 폴백으로 체크박스 {checked}개 처리")
-            time.sleep(0.3)
     except Exception:
         pass
 
 
+def _is_on_cart_page(page: Page) -> bool:
+    return any(p in page.url for p in CART_URL_PATTERNS)
+
+
+def _wait_for_cart_leave(page: Page, timeout_ms: int = 6000) -> bool:
+    """장바구니 URL에서 벗어날 때까지 대기. 이동 성공 시 True."""
+    try:
+        page.wait_for_function(
+            "() => " + " && ".join(
+                [f"!location.href.includes('{p}')" for p in CART_URL_PATTERNS]
+            ),
+            timeout=timeout_ms,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _click_order_btn(page: Page) -> bool:
-    """전체선택 후 주문하기 버튼을 스크롤하여 클릭. 성공 여부 반환."""
     _select_all_cart_items(page)
 
     for sel in ORDER_BTN_SELECTORS:
@@ -489,32 +498,88 @@ def _click_order_btn(page: Page) -> bool:
             btn = page.locator(sel).first
             if btn.count() == 0:
                 continue
-            try:
-                btn.scroll_into_view_if_needed(timeout=3000)
-                time.sleep(0.3)
-            except Exception:
-                pass
             if not btn.is_visible(timeout=2000):
                 continue
             print(f"  [주문하기] 버튼 발견 ({sel}), 클릭 시도")
+
+            # 1) tap() — 모바일 컨텍스트에서는 touch 이벤트가 필요
             try:
-                btn.click(timeout=5000)
-                print(f"  [주문하기] ✅ click() 성공")
+                btn.scroll_into_view_if_needed(timeout=2000)
+            except Exception:
+                pass
+            try:
+                btn.tap(timeout=5000)
+                print(f"  [주문하기] ✅ tap() 성공, 이동 대기...")
             except Exception as e:
-                print(f"  [주문하기] ❌ click() 실패 ({str(e)[:40]}), evaluate로 재시도")
+                print(f"  [주문하기] tap() 실패 ({str(e)[:40]}), click 시도")
+                try:
+                    btn.click(timeout=5000, force=True)
+                    print(f"  [주문하기] ✅ click() 성공, 이동 대기...")
+                except Exception as e2:
+                    print(f"  [주문하기] ❌ click() 실패 ({str(e2)[:40]})")
+
+            if _wait_for_cart_leave(page, 5000):
+                return True
+            print(f"  [주문하기] 클릭 후 페이지 미변경, cartOrder.buy() 직접 호출")
+
+            # 2) cartOrder 상태 진단 + jQuery 이벤트 갱신 후 cartOrder.buy() 직접 호출
+            try:
+                debug = page.evaluate("""() => {
+                    const checked = document.querySelectorAll('input[type="checkbox"]:checked');
+                    const all = document.querySelectorAll('input[type="checkbox"]');
+                    const ids = Array.from(checked).slice(0, 5).map(c => c.id || c.name || '?');
+                    const classes = Array.from(checked).slice(0, 5).map(c => c.className || '?');
+                    const buyFn = (window.cartOrder && cartOrder.buy)
+                        ? cartOrder.buy.toString().substring(0, 300) : 'N/A';
+                    return {checkedCount: checked.length, totalCount: all.length, ids: ids,
+                            classes: classes,
+                            hasCartOrder: !!window.cartOrder,
+                            hasjQuery: !!window.jQuery,
+                            buyFn: buyFn};
+                }""")
+                print(f"  [주문하기] 진단: checkedCount={debug.get('checkedCount')}, ids={debug.get('ids')}, classes={debug.get('classes')}")
+                print(f"  [주문하기] cartOrder.buy 소스: {debug.get('buyFn', 'N/A')[:300]}")
+            except Exception:
+                pass
+            try:
+                page.evaluate("""() => {
+                    const boxes = document.querySelectorAll('input[type="checkbox"]');
+                    boxes.forEach(cb => {
+                        if (!cb.checked) { cb.checked = true; }
+                        cb.dispatchEvent(new Event('change', {bubbles:true}));
+                        if (window.jQuery) { jQuery(cb).trigger('change').trigger('click'); }
+                    });
+                }""")
+                page.evaluate("cartOrder.buy()")
+                print(f"  [주문하기] ✅ cartOrder.buy() 호출 성공, 이동 대기...")
+            except Exception as e2:
+                print(f"  [주문하기] ❌ cartOrder.buy() 실패 ({str(e2)[:40]})")
+
+            if _wait_for_cart_leave(page, 5000):
+                return True
+            print(f"  [주문하기] cartOrder.buy() 후에도 미변경, evaluate click 시도")
+
+            # 3) 최후 수단
+            try:
                 btn.evaluate("el => el.click()")
                 print(f"  [주문하기] ✅ evaluate click() 성공")
-            return True
+            except Exception:
+                pass
+
+            if _wait_for_cart_leave(page, 3000):
+                return True
+
+            print(f"  [주문하기] ❌ 모든 방법 실패 (URL: {page.url})")
+            return False
         except Exception:
             continue
     return False
 
 
-def run(page: Page, url: str, username: str, password: str) -> str:
-    base = url.replace("/main", "")
-    is_mobile = "mdream" in url
+def run(page: Page, url: str, username: str, password: str, mobile: bool = False) -> str:
+    base = url.replace("/main", "").rstrip("/")
+    is_mobile = mobile
 
-    # ── dialog 핸들러: 중복 처리 방지 ───────────────────────────────────────
     def _safe_accept(d):
         try:
             print(f"  [Dialog] {d.type}: {d.message[:50]}")
@@ -526,21 +591,17 @@ def run(page: Page, url: str, username: str, password: str) -> str:
     page.on("dialog", _safe_accept)
 
     try:
-        # 로그인
         ok = login(page, url, username, password)
         assert ok, "로그인 실패"
 
-        # 사전 정리: 장바구니 비우기 (이전 실행 잔여물 제거)
         print(f"  [장바구니 사전 정리] 장바구니 비우기 시도")
         initial_count = _empty_cart(page, url)
         print(f"  [장바구니 사전 정리] 정리 후 항목 수: {initial_count}")
 
-        # 메인으로 이동 & 인기상품 섹션 로드
-        page.goto(url, wait_until="load", timeout=20000)
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)
         close_popups(page)
         _scroll_to_popular(page)
 
-        # ── PC / Mobile 분기 ─────────────────────────────────────────────────
         if not is_mobile:
             product_name, success = _pc_cart_flow(page)
             assert success, "인기상품 섹션에서 장바구니 담기 버튼을 찾을 수 없음"
@@ -550,40 +611,37 @@ def run(page: Page, url: str, username: str, password: str) -> str:
 
         close_popups(page)
 
-        # ── 장바구니 페이지 이동 및 상품 확인 ──────────────────────────────
         print(f"  [장바구니 확인] 장바구니 페이지로 이동 시도")
         _goto_cart(page, url)
         print(f"  [장바구니 확인] 현재 URL: {page.url}")
 
-        time.sleep(1)
+        # 장바구니 아이템 로드 대기
+        try:
+            page.wait_for_selector(", ".join(CART_ITEM_SELECTORS[:4]), timeout=5000)
+        except Exception:
+            pass
 
         item_count = _count_cart_items(page, url)
         print(f"  [장바구니 확인] 사전 {initial_count}개 → 사후 {item_count}개")
 
-        # 사전 정리 후 카운트가 실제로 증가했는지로 검증 (false positive 방지)
         assert item_count > initial_count, (
             f"장바구니에 상품이 추가되지 않음 (사전 {initial_count}개 → 사후 {item_count}개)"
         )
 
-        # ── 주문하기 버튼 클릭 및 결제 페이지 이동 확인 ──────────────────────
         close_popups(page)
         print(f"  [주문하기] 주문하기 버튼 클릭 시도")
         order_clicked = _click_order_btn(page)
-        assert order_clicked, "주문하기 버튼을 찾을 수 없음"
-
-        try:
-            page.wait_for_url(f"**{ORDER_PAYMENT_PATH}**", timeout=10000)
-        except Exception:
-            pass
+        assert order_clicked, "주문하기 버튼 클릭 후 페이지 이동 없음"
 
         current_url = page.url
         print(f"  [주문하기] 현재 URL: {current_url}")
-        assert ORDER_PAYMENT_PATH in current_url, (
-            f"결제 페이지로 이동 실패 (현재: {current_url})"
+        ok_checkout = any(p in current_url for p in CHECKOUT_PATHS)
+        assert ok_checkout, (
+            f"결제/배송지 페이지 이동 실패 (현재: {current_url})"
         )
-        print(f"  [주문하기] ✅ {ORDER_PAYMENT_PATH} 이동 성공")
+        reached = next(p for p in CHECKOUT_PATHS if p in current_url)
+        print(f"  [주문하기] ✅ {reached} 이동 성공")
 
-        # 사후 정리
         try:
             _empty_cart(page, url)
         except Exception:

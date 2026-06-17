@@ -1,6 +1,94 @@
-urls:
-  pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
-  mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
+malls:
+  - name: "드림몰"
+    id: dream
+    urls:
+      pc: "https://dream.onuri.co.kr/main"
+      mobile: "https://mdream.onuri.co.kr/main"
+    requires_login: true
+    categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
+      - 생활/건강
+      - 스포츠/레저/자동차
+      - 식품
+      - 잡화
+
+
+  - name: "행정공제회(poba)"
+    id: poba
+    urls:
+      pc: "https://www.pobaonuri.kr/"
+      mobile: "https://m.pobaonuri.kr/"
+    login_url: "https://www.pobaonuri.kr/indexLogin"
+    requires_login: true
+    categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
+      - 생활/건강
+      - 스포츠/레저/자동차
+      - 식품
+      - 의류
+      - 잡화
+      - 출산/육아
+
+  - name: "삼아(samaint)"
+    id: sama
+    urls:
+      pc: "https://samaint.onuri.co.kr/"
+      mobile: "https://msamaint.onuri.co.kr/"
+    requires_login: true
+    categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
+      - 생활/건강
+      - 스포츠/레저/자동차
+      - 식품
+      - 의류
+      - 잡화
+      - 출산/육아
+
+  - name: "교직원공제회(thek)"
+    id: thek
+    urls:
+      pc: "https://thek.onuri.co.kr/"
+      mobile: "https://mthek.onuri.co.kr/"
+    requires_login: true
+    categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
+      - 생활/건강
+      - 스포츠/레저/자동차
+      - 식품
+      - 의류
+      - 잡화
+      - 출산/육아
+
+  - name: "welfare(castdream)"
+    id: castdream
+    urls:
+      pc: "https://mcastdream.onuri.co.kr/"
+      mobile: "https://castdream.onuri.co.kr/"
+    requires_login: false
+    skip: true
+    categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
+      - 생활/건강
+      - 스포츠/레저/자동차
+      - 식품
+      - 의류
+      - 잡화
+      - 출산/육아
 
 search:
   valid:
@@ -10,17 +98,16 @@ search:
     - 닭가슴살
     - 텀블러
     - 이어폰
-    - 휴대폰
     - 신발
-    - 핸드폰
-    - 게임
+    - 케이스
     - 옷
     - 크림
     - 우산
-    - 백팩
-    - 충전기
-    - 노트북
-    - 노이즈 캔슬링
+    - 가방
+    - 찌개
+    - 고기
+    - 떡
+    - 김치
     - 치약
 
 categories:

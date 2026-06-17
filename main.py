@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-from tests.base import KST, TestResult, init_browser, run_test, now_kst
+from tests.base import KST, TestResult, init_browser, run_test, login, now_kst
 from tests import test_main, test_popup, test_search, test_category, test_gnb, test_popular, test_cart, test_shipping
 from report.generator import build_report, build_simple_message
 from report.dooray import send as dooray_send
@@ -25,22 +25,32 @@ def load_config() -> dict:
         return yaml.safe_load(f)
 
 
-def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> list[TestResult]:
-    platform = "Mobile" if mobile else "PC"
-    url = cfg["urls"]["mobile"] if mobile else cfg["urls"]["pc"]
+def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool = True) -> list[TestResult]:
+    mall_name = mall["name"]
+    platform_label = f"{mall_name} {'Mobile' if mobile else 'PC'}"
+    url = mall["urls"]["mobile"] if mobile else mall["urls"]["pc"]
+    requires_login = mall.get("requires_login", False)
+    explicit_login_url = mall.get("login_url", "")
+
     username = os.environ.get("ID", "")
     password = os.environ.get("PASSWORD", "")
     valid_kws = cfg["search"]["valid"]
-    cat_pool = cfg["categories"]["pool"]
+    cat_pool = mall.get("categories") or cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
 
     results = []
     browser, context, page = init_browser(playwright, mobile=mobile, headless=headless)
 
     try:
+        # 로그인이 필요한 몰: 테스트 시작 전 로그인
+        if requires_login and username:
+            print(f"  [로그인] {mall_name} 로그인 시도...", end=" ", flush=True)
+            ok = login(page, url, username, password, login_url=explicit_login_url)
+            print("[완료]" if ok else "[실패] 로그인 실패, 계속 진행")
+
         # 1. 메인 화면 진입
         print(f"  [1/8] 메인 화면 진입...", end=" ", flush=True)
-        result = run_test("메인 화면 진입", platform, page,
+        result = run_test("메인 화면 진입", platform_label, page,
                          lambda p: test_main.run(p, url))
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
@@ -49,7 +59,9 @@ def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> 
         print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
         browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True, headless=headless)
         try:
-            result = run_test("메인 팝업 노출", platform, page2,
+            if requires_login and username:
+                login(page2, url, username, password, login_url=explicit_login_url)
+            result = run_test("메인 팝업 노출", platform_label, page2,
                             lambda p: test_popup.run(p, url), save_all_screenshots=True)
             results.append(result)
             print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
@@ -58,28 +70,28 @@ def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> 
 
         # 3. 검색
         print(f"  [3/8] 검색 기능...", end=" ", flush=True)
-        result = run_test("검색 기능", platform, page,
+        result = run_test("검색 기능", platform_label, page,
                          lambda p: test_search.run(p, url, valid_kws))
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 4. 카테고리
         print(f"  [4/8] 카테고리 상품 노출...", end=" ", flush=True)
-        result = run_test("카테고리 상품 노출", platform, page,
+        result = run_test("카테고리 상품 노출", platform_label, page,
                          lambda p: test_category.run(p, url, cat_pool, cat_count, mobile))
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 5. GNB 메뉴
         print(f"  [5/8] GNB 메뉴 진입...", end=" ", flush=True)
-        result = run_test("GNB 메뉴 진입", platform, page,
-                         lambda p: test_gnb.run(p, url, username, password))
+        result = run_test("GNB 메뉴 진입", platform_label, page,
+                         lambda p: test_gnb.run(p, url, username, password, mobile=mobile))
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 6. 인기상품
         print(f"  [6/8] 하단 인기상품 목록...", end=" ", flush=True)
-        result = run_test("하단 인기상품 목록", platform, page,
+        result = run_test("하단 인기상품 목록", platform_label, page,
                          lambda p: test_popular.run(p, url))
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
@@ -87,8 +99,8 @@ def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> 
         # 7. 장바구니 (계정이 있을 때만)
         if username:
             print(f"  [7/8] 장바구니 담기...", end=" ", flush=True)
-            result = run_test("장바구니 담기", platform, page,
-                            lambda p: test_cart.run(p, url, username, password))
+            result = run_test("장바구니 담기", platform_label, page,
+                            lambda p: test_cart.run(p, url, username, password, mobile=mobile))
             results.append(result)
             print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
         else:
@@ -97,7 +109,7 @@ def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> 
         # 8. 배송지 등록 (계정이 있을 때만)
         if username:
             print(f"  [8/8] 배송지 등록 양식...", end=" ", flush=True)
-            result = run_test("배송지 등록 양식", platform, page,
+            result = run_test("배송지 등록 양식", platform_label, page,
                             lambda p: test_shipping.run(p, url, username, password))
             results.append(result)
             print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
@@ -112,20 +124,19 @@ def run_platform(playwright, cfg: dict, mobile: bool, headless: bool = True) -> 
 
 def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
     all_results = []
-    with sync_playwright() as playwright:
-        print("\n[PC] 테스트 시작...")
-        print("-" * 50)
-        pc_results = run_platform(playwright, cfg, mobile=False, headless=headless)
-        all_results += pc_results
-        pc_pass = sum(1 for r in pc_results if r.passed)
-        print(f"PC 완료: {pc_pass}/{len(pc_results)} 통과\n")
+    malls = [m for m in cfg.get("malls", []) if not m.get("skip", False)]
 
-        print("[Mobile] 테스트 시작...")
-        print("-" * 50)
-        mob_results = run_platform(playwright, cfg, mobile=True, headless=headless)
-        all_results += mob_results
-        mob_pass = sum(1 for r in mob_results if r.passed)
-        print(f"Mobile 완료: {mob_pass}/{len(mob_results)} 통과\n")
+    with sync_playwright() as playwright:
+        for mall in malls:
+            mall_name = mall["name"]
+            for mobile in [False, True]:
+                label = "Mobile" if mobile else "PC"
+                print(f"\n[{mall_name} / {label}] 테스트 시작...")
+                print("-" * 50)
+                results = run_platform(playwright, mall, cfg, mobile=mobile, headless=headless)
+                all_results += results
+                passed = sum(1 for r in results if r.passed)
+                print(f"{mall_name} {label} 완료: {passed}/{len(results)} 통과")
 
     return all_results
 
@@ -190,12 +201,12 @@ def main():
     print(f"\n리포트 저장: {report_path}")
 
     # 두레이 발송 (간단한 요약 메시지)
-    webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
-    bot_name = cfg["dooray"]["bot_name"]
-    if webhook_url:
-        simple_msg = build_simple_message(results)
-        ok = dooray_send(webhook_url, bot_name, simple_msg)
-        print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
+    # webhook_url = os.environ.get("DOORAY_WEBHOOK_URL", "")
+    # bot_name = cfg["dooray"]["bot_name"]
+    # if webhook_url:
+    #     simple_msg = build_simple_message(results)
+    #     ok = dooray_send(webhook_url, bot_name, simple_msg)
+    #     print(f"두레이 발송: {'성공 ✓' if ok else '실패 ✗'}")
 
     sys.exit(1 if fail_count > 0 else 0)
 
