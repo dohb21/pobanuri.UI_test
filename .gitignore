@@ -4,3 +4,7 @@
 /logs
 .env
 *.bat
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

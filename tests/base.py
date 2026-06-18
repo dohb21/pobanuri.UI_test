@@ -85,7 +85,7 @@ _DESKTOP_UA = (
 )
 
 
-def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True):
+def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True, block_resources: bool = True):
     launch_kwargs = {
         "headless": headless,
         "args": [
@@ -117,6 +117,12 @@ def init_browser(playwright: Playwright, mobile: bool = False, record_video: boo
         )
     page = context.new_page()
     page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    # 이미지/폰트/미디어 차단으로 로딩 속도 향상 (팝업 비디오 녹화 시 제외)
+    if block_resources:
+        page.route(
+            "**/*.{png,jpg,jpeg,gif,svg,webp,ico,avif,woff,woff2,ttf,eot,mp4,webm}",
+            lambda route: route.abort()
+        )
     page.set_default_timeout(15000)
     return browser, context, page
 

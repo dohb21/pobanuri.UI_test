@@ -48,19 +48,36 @@ def _get_mobile_gnb_items(page: Page) -> list[dict]:
     items = []
     try:
         gnb_ul = page.locator("ul.swiper-wrapper:has(li.swiper-slide > a[href='/main'])").first
-        slides = gnb_ul.locator("li.swiper-slide").all()
-        for idx, slide in enumerate(slides):
+
+        # Swiper가 슬라이드를 지연 렌더링할 수 있으므로 count가 안정될 때까지 대기
+        prev_count = 0
+        for _ in range(5):
+            count = gnb_ul.locator("li.swiper-slide").count()
+            if count == prev_count and count > 0:
+                break
+            prev_count = count
             try:
+                page.wait_for_timeout(300)
+            except Exception:
+                pass
+
+        # all() 대신 count()+nth() — all()은 호출 시점 스냅샷이라 뒤늦게 추가된 슬라이드를 놓침
+        count = gnb_ul.locator("li.swiper-slide").count()
+        for idx in range(count):
+            try:
+                slide = gnb_ul.locator("li.swiper-slide").nth(idx)
                 a = slide.locator("a").first
+                if a.count() == 0:
+                    continue
                 text = (a.text_content(timeout=500) or "").strip()
                 href = a.get_attribute("href") or ""
                 onclick = a.get_attribute("onclick") or ""
                 if text:
                     items.append({"text": text, "href": href, "onclick": onclick, "idx": idx})
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                print(f"  [GNB] 슬라이드 {idx} 오류: {str(e)[:40]}")
+    except Exception as e:
+        print(f"  [GNB] 모바일 GNB 탐색 실패: {str(e)[:40]}")
     return items
 
 

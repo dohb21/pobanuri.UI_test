@@ -1,5 +1,4 @@
 import random
-import time
 from playwright.sync_api import Page
 from .base import close_popups
 
@@ -49,8 +48,15 @@ def _open_and_click_category_pc(page: Page, category: str) -> bool:
 
 def _open_and_click_category_mobile(page: Page, category: str) -> bool:
     """
-    Mobile: fn_totalMenuToggle() 아이콘 클릭 → 대분류 클릭 → 중분류 첫 항목 클릭
+    Mobile: 전체메뉴 열기 → 대분류 클릭 → 중분류 첫 항목 클릭
+    Playwright get_by_role/filter 사용으로 DOM 인덱스 밀림 문제 해결
     """
+    def _tap_or_click(el):
+        try:
+            el.tap(timeout=2000)
+        except Exception:
+            el.evaluate("el => el.click()")
+
     try:
         # 1. 전체 메뉴 열기
         menu_opened = False
@@ -66,15 +72,7 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
             try:
                 el = page.locator(sel).first
                 if el.count() > 0:
-                    el.evaluate("el => el.click()")
-                    try:
-                        page.wait_for_selector(
-                            "[class*='totalMenu'], [class*='total-menu'], [class*='allMenu'], "
-                            "[class*='all-menu'], [class*='gnbAll'], [class*='sideMenu']",
-                            timeout=3000
-                        )
-                    except Exception:
-                        time.sleep(0.5)
+                    _tap_or_click(el)
                     menu_opened = True
                     break
             except Exception:
@@ -83,74 +81,37 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
         if not menu_opened:
             return False
 
-        # 메뉴 링크가 렌더링될 때까지 대기
-        try:
-            page.wait_for_function("() => document.querySelectorAll('a').length > 5", timeout=2000)
-        except Exception:
-            pass
+        # 2. 대분류(depth1) 링크를 Playwright 텍스트 매칭으로 직접 탐색
+        #    all() 스냅샷 방식은 DOM 변경 시 인덱스가 밀려 오동작 → get_by_role 사용
+        cat_link = None
+        cat_short = category.split("/")[0]
 
-        # 2. 대분류(depth1) 클릭 — 정확 일치 우선, 없으면 포함 일치
-        d1_found = False
-        all_links = page.locator("a").all()
-
-        def _normalize(text: str) -> str:
-            return " ".join(text.split())  # 탭·줄바꿈·다중공백 정규화
-
-        def _click_el(el):
-            """모바일 tap 우선, 실패 시 evaluate click"""
+        # 2-a. 정확 일치: get_by_role("link", name=..., exact=True)
+        for attempt in [category, cat_short]:
             try:
-                el.tap(timeout=2000)
-            except Exception:
-                el.evaluate("el => el.click()")
-
-        # 정확 일치
-        for d1 in all_links:
-            try:
-                if not d1.is_visible(timeout=300):
-                    continue
-                text = _normalize(d1.inner_text(timeout=200))
-                if text == category:
-                    _click_el(d1)
-                    d1_found = True
-                    break
+                loc = page.get_by_role("link", name=attempt, exact=True)
+                loc.first.wait_for(state="visible", timeout=3000)
+                cat_link = loc.first
+                break
             except Exception:
                 continue
 
-        # 포함 일치 (예: '문구/취미/펫' → '문구/취미')
-        if not d1_found:
-            cat_short = category.split("/")[0]  # 첫 번째 슬래시 이전
-            for d1 in all_links:
-                try:
-                    if not d1.is_visible(timeout=200):
-                        continue
-                    text = _normalize(d1.inner_text(timeout=200))
-                    if cat_short and cat_short in text and len(text) < 30:
-                        _click_el(d1)
-                        d1_found = True
-                        break
-                except Exception:
-                    continue
-
-        if not d1_found:
-            return False
-
-        # 3. 클릭 후 URL 변경(페이지 이동) 또는 중분류 노출 대기
-        try:
-            page.wait_for_function(
-                "() => location.href.includes('indexCategory') || location.href.includes('/category')",
-                timeout=3000,
-            )
-            # 직접 카테고리 페이지로 이동
+        # 2-b. 포함 일치: locator("a").filter(has_text=...)
+        if cat_link is None:
             try:
-                page.wait_for_load_state("domcontentloaded", timeout=8000)
+                loc = page.locator("a").filter(has_text=cat_short)
+                loc.first.wait_for(state="visible", timeout=2000)
+                cat_link = loc.first
             except Exception:
                 pass
-            return True
-        except Exception:
-            pass
 
-        # 중분류(depth2) 나타날 때까지 대기 후 클릭
-        # poba/samaint/thek: <li class="dev-category-lvl-02" dispclsfno="..."> 구조
+        if cat_link is None:
+            return False
+
+        _tap_or_click(cat_link)
+
+        # 3. 중분류(depth2) 대기 후 클릭
+        #    poba/samaint/thek: <li class="dev-category-lvl-02" dispclsfno="...">
         for d2_sel in [
             "li[class*='lvl-02']",
             "li[class*='category-lvl']",
@@ -166,7 +127,7 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
                 page.wait_for_selector(d2_sel, timeout=2000)
                 d2 = page.locator(d2_sel).first
                 if d2.is_visible(timeout=1000):
-                    _click_el(d2)
+                    _tap_or_click(d2)
                     try:
                         page.wait_for_load_state("domcontentloaded", timeout=8000)
                     except Exception:
@@ -175,6 +136,7 @@ def _open_and_click_category_mobile(page: Page, category: str) -> bool:
             except Exception:
                 continue
 
+        # depth2 없이 depth1 클릭만으로 페이지 이동한 경우도 성공 처리
         return True
     except Exception:
         return False

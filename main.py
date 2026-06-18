@@ -5,6 +5,7 @@ sys.stderr.reconfigure(encoding='utf-8')
 import time
 import random
 import yaml
+import concurrent.futures
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
@@ -57,7 +58,7 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
 
         # 2. 메인 팝업 (비디오 녹화 + 스크린샷)
         print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
-        browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True, headless=headless)
+        browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True, headless=headless, block_resources=False)
         try:
             if requires_login and username:
                 login(page2, url, username, password, login_url=explicit_login_url)
@@ -122,21 +123,45 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
     return results
 
 
-def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
-    all_results = []
-    malls = [m for m in cfg.get("malls", []) if not m.get("skip", False)]
+def _run_mall_worker(args: tuple) -> list[TestResult]:
+    """각 몰을 독립 프로세스에서 실행하는 워커 함수."""
+    mall, cfg, headless = args
+    # 자식 프로세스에서 인코딩 및 환경변수 재설정
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
+    mall_name = mall["name"]
+    all_results = []
     with sync_playwright() as playwright:
-        for mall in malls:
-            mall_name = mall["name"]
-            for mobile in [False, True]:
-                label = "Mobile" if mobile else "PC"
-                print(f"\n[{mall_name} / {label}] 테스트 시작...")
-                print("-" * 50)
-                results = run_platform(playwright, mall, cfg, mobile=mobile, headless=headless)
-                all_results += results
-                passed = sum(1 for r in results if r.passed)
-                print(f"{mall_name} {label} 완료: {passed}/{len(results)} 통과")
+        for mobile in [False, True]:
+            label = "Mobile" if mobile else "PC"
+            print(f"\n[{mall_name} / {label}] 테스트 시작...", flush=True)
+            print("-" * 50, flush=True)
+            results = run_platform(playwright, mall, cfg, mobile=mobile, headless=headless)
+            all_results += results
+            passed = sum(1 for r in results if r.passed)
+            print(f"{mall_name} {label} 완료: {passed}/{len(results)} 통과", flush=True)
+    return all_results
+
+
+def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
+    malls = [m for m in cfg.get("malls", []) if not m.get("skip", False)]
+    args_list = [(mall, cfg, headless) for mall in malls]
+
+    all_results = []
+    # 몰별 병렬 실행: 4개 몰이 동시에 실행되어 총 소요 시간 ≈ 가장 느린 몰 1개 기준
+    with concurrent.futures.ProcessPoolExecutor(max_workers=len(malls)) as executor:
+        futures = {executor.submit(_run_mall_worker, args): args[0]["name"] for args in args_list}
+        for future in concurrent.futures.as_completed(futures):
+            mall_name = futures[future]
+            try:
+                all_results += future.result()
+            except Exception as e:
+                print(f"[오류] {mall_name} 테스트 실패: {e}")
 
     return all_results
 

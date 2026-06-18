@@ -420,6 +420,11 @@ def _mobile_cart_flow(page: Page, base: str) -> tuple:
 
 
 def _select_all_cart_items(page: Page):
+    """
+    장바구니 체크박스를 모두 체크하고, cartOrder 내부 상태를 동기화한다.
+    - 이미 체크된 박스도 change 이벤트를 발생시켜 cartOrder.selectedItems를 채운다.
+    - click 이벤트는 체크박스를 토글(반전)시키므로 절대 사용하지 않는다.
+    """
     for sel in [
         "input[type='checkbox'][id^='up_comp_no_checkbox']",
         "input[type='checkbox'][id*='all']",
@@ -431,43 +436,47 @@ def _select_all_cart_items(page: Page):
             boxes = page.locator(sel).all()
             if not boxes:
                 continue
-            checked_any = False
+            found_any = False
             for chk in boxes:
                 try:
-                    if chk.is_visible(timeout=500):
-                        if not chk.is_checked():
-                            try:
-                                chk.check(timeout=1500)
-                            except Exception:
-                                chk.evaluate(
-                                    "el => { el.checked = true;"
-                                    " el.dispatchEvent(new Event('change', {bubbles:true}));"
-                                    " el.dispatchEvent(new Event('click', {bubbles:true})); }"
-                                )
-                        checked_any = True
+                    if not chk.is_visible(timeout=500):
+                        continue
+                    found_any = True
+                    if not chk.is_checked():
+                        try:
+                            chk.check(timeout=1500)
+                        except Exception:
+                            chk.evaluate(
+                                "el => { el.checked = true;"
+                                " if(window.jQuery) jQuery(el).trigger('change');"
+                                " else el.dispatchEvent(new Event('change', {bubbles:true})); }"
+                            )
+                    else:
+                        # 이미 체크됨 — cartOrder 동기화를 위해 change 이벤트만 발생
+                        chk.evaluate(
+                            "el => { if(window.jQuery) jQuery(el).trigger('change');"
+                            " else el.dispatchEvent(new Event('change', {bubbles:true})); }"
+                        )
                 except Exception:
                     continue
-            if checked_any:
+            if found_any:
                 print(f"  [주문하기] 전체선택 체크 완료 ({sel}, {len(boxes)}개)")
                 return
         except Exception:
             continue
+    # 폴백: 모든 체크박스에 change 이벤트 발생 (click 이벤트 없음)
     try:
-        checked = page.evaluate("""() => {
+        cnt = page.evaluate("""() => {
             const boxes = document.querySelectorAll('input[type="checkbox"]');
-            let cnt = 0;
             boxes.forEach(cb => {
-                if (!cb.checked) {
-                    cb.checked = true;
-                    cb.dispatchEvent(new Event('change', {bubbles: true}));
-                    cb.dispatchEvent(new Event('click', {bubbles: true}));
-                }
-                cnt++;
+                if (!cb.checked) { cb.checked = true; }
+                if (window.jQuery) jQuery(cb).trigger('change');
+                else cb.dispatchEvent(new Event('change', {bubbles: true}));
             });
-            return cnt;
+            return boxes.length;
         }""")
-        if checked:
-            print(f"  [주문하기] 전체선택 JS 폴백으로 체크박스 {checked}개 처리")
+        if cnt:
+            print(f"  [주문하기] 전체선택 JS 폴백으로 체크박스 {cnt}개 처리")
     except Exception:
         pass
 
@@ -546,8 +555,9 @@ def _click_order_btn(page: Page) -> bool:
                     const boxes = document.querySelectorAll('input[type="checkbox"]');
                     boxes.forEach(cb => {
                         if (!cb.checked) { cb.checked = true; }
-                        cb.dispatchEvent(new Event('change', {bubbles:true}));
-                        if (window.jQuery) { jQuery(cb).trigger('change').trigger('click'); }
+                        // trigger('change')만 사용 — trigger('click')은 체크박스를 토글(반전)시킴
+                        if (window.jQuery) { jQuery(cb).trigger('change'); }
+                        else { cb.dispatchEvent(new Event('change', {bubbles:true})); }
                     });
                 }""")
                 page.evaluate("cartOrder.buy()")
