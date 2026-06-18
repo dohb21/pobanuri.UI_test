@@ -85,7 +85,7 @@ _DESKTOP_UA = (
 )
 
 
-def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True, block_resources: bool = True):
+def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True):
     launch_kwargs = {
         "headless": headless,
         "args": [
@@ -117,12 +117,6 @@ def init_browser(playwright: Playwright, mobile: bool = False, record_video: boo
         )
     page = context.new_page()
     page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    # 이미지/폰트/미디어 차단으로 로딩 속도 향상 (팝업 비디오 녹화 시 제외)
-    if block_resources:
-        page.route(
-            "**/*.{png,jpg,jpeg,gif,svg,webp,ico,avif,woff,woff2,ttf,eot,mp4,webm}",
-            lambda route: route.abort()
-        )
     page.set_default_timeout(15000)
     return browser, context, page
 
@@ -147,7 +141,7 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
         if login_url == base_url:
             login_url = base_url.rstrip("/") + "/indexLogin"
     try:
-        page.goto(login_url, wait_until="load", timeout=20000)
+        page.goto(login_url, wait_until="domcontentloaded", timeout=20000)
         close_popups(page)
 
         # 이미 로그인된 경우 – login 페이지가 아니면 성공으로 처리

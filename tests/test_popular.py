@@ -7,7 +7,7 @@ def run(page: Page, url: str) -> str:
     """메인 하단 '카테고리별 인기 상품 추천' 섹션 노출 확인.
     실제 HTML: div.section.sec_6 > ul#categoryMenu + ul#searchUnitList
     페이지 로드 시 JS가 자동으로 첫 탭 클릭해 #searchUnitList에 상품 로드함."""
-    page.goto(url, wait_until="load", timeout=25000)
+    page.goto(url, wait_until="domcontentloaded", timeout=25000)
     close_popups(page)
 
     # 인기상품 섹션 존재 확인

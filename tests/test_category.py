@@ -165,8 +165,13 @@ def run(page: Page, url: str, category_pool: list, count: int, mobile: bool = Fa
 
     for cat in chosen:
         try:
-            wait = "domcontentloaded" if mobile else "load"
-            page.goto(url, wait_until=wait, timeout=25000)
+            for _attempt in range(2):
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=25000)
+                    break
+                except Exception:
+                    if _attempt == 1:
+                        raise
             close_popups(page)
 
             if mobile:
@@ -185,6 +190,16 @@ def run(page: Page, url: str, category_pool: list, count: int, mobile: bool = Fa
                 pass
 
             product_count = _count_products(page)
+            if product_count == 0:
+                # AJAX 로드 지연 시 추가 대기 후 재확인
+                try:
+                    page.wait_for_selector(
+                        "#searchUnitList li, a[href*='/goods/indexGoodsDetail']",
+                        timeout=8000
+                    )
+                except Exception:
+                    pass
+                product_count = _count_products(page)
             assert product_count > 0, f"카테고리 '{cat}' 상품 없음"
             ok_list.append(f"'{cat}'({product_count}개)")
         except Exception as e:

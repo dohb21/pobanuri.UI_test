@@ -56,18 +56,12 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
         results.append(result)
         print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
-        # 2. 메인 팝업 (비디오 녹화 + 스크린샷)
+        # 2. 메인 팝업
         print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
-        browser2, ctx2, page2 = init_browser(playwright, mobile=mobile, record_video=True, headless=headless, block_resources=False)
-        try:
-            if requires_login and username:
-                login(page2, url, username, password, login_url=explicit_login_url)
-            result = run_test("메인 팝업 노출", platform_label, page2,
-                            lambda p: test_popup.run(p, url), save_all_screenshots=True)
-            results.append(result)
-            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
-        finally:
-            browser2.close()
+        result = run_test("메인 팝업 노출", platform_label, page,
+                         lambda p: test_popup.run(p, url), save_all_screenshots=True)
+        results.append(result)
+        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 3. 검색
         print(f"  [3/8] 검색 기능...", end=" ", flush=True)
@@ -153,8 +147,8 @@ def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
     args_list = [(mall, cfg, headless) for mall in malls]
 
     all_results = []
-    # 몰별 병렬 실행: 4개 몰이 동시에 실행되어 총 소요 시간 ≈ 가장 느린 몰 1개 기준
-    with concurrent.futures.ProcessPoolExecutor(max_workers=len(malls)) as executor:
+    # 2개씩 병렬 실행: 동시 로그인 수 제한으로 SSO 세션 충돌 방지
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
         futures = {executor.submit(_run_mall_worker, args): args[0]["name"] for args in args_list}
         for future in concurrent.futures.as_completed(futures):
             mall_name = futures[future]
@@ -188,7 +182,7 @@ def main():
     headless = "--show" not in sys.argv
     start = time.time()
     print("\n" + "=" * 60)
-    print(f"드림몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")
+    print(f"커머스/온누리몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")
     print("=" * 60)
     print("\n콘솔 출력을 통해 상세한 테스트 과정을 추적할 수 있습니다.")
     print("   팝업, 검색, 카테고리 등 각 테스트의 성공/실패 원인이 표시됩니다.\n")

@@ -127,6 +127,13 @@ def run(page: Page, url: str, valid_keywords: list) -> str:
         try:
             _do_search(page, url, kw, first_search=(idx == 0))
             count = _count_results(page)
+            if count == 0 and not _has_no_result(page):
+                # AJAX 로드 지연 시 추가 대기 후 재확인
+                try:
+                    page.wait_for_selector("#searchUnitList li", timeout=8000)
+                except Exception:
+                    pass
+                count = _count_results(page)
             assert count > 0, f"'{kw}' 검색 결과 상품 없음"
             ok_list.append(f"'{kw}'({count}개)")
         except Exception as e:

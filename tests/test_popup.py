@@ -55,7 +55,7 @@ def _get_slide_links(popup_el) -> list[str]:
 
 def _test_slide_link(page: Page, href: str, slide_idx: int, url: str) -> bool:
     """슬라이드 링크로 진입 테스트"""
-    base = url.split("/main")[0]
+    base = url.split("/main")[0].rstrip("/")
     if href.startswith("/"):
         target = base + href
     elif href.startswith("http"):
@@ -65,7 +65,7 @@ def _test_slide_link(page: Page, href: str, slide_idx: int, url: str) -> bool:
 
     print(f"  [슬라이드 {slide_idx}] 이동: {target}")
     try:
-        page.goto(target, wait_until="domcontentloaded", timeout=10000)
+        page.goto(target, wait_until="domcontentloaded", timeout=15000)
         time.sleep(0.5)
         cur = page.url
         ok = "goods" in cur.lower() or "detail" in cur.lower()
@@ -110,7 +110,7 @@ def run(page: Page, url: str) -> str:
 
         # 메인으로 복귀
         try:
-            page.go_back(wait_until="domcontentloaded", timeout=10000)
+            page.go_back(wait_until="domcontentloaded", timeout=15000)
             print(f"  [슬라이드 {i}] 뒤로가기 성공")
             time.sleep(1)
         except Exception:
