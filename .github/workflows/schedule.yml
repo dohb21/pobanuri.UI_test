@@ -2,10 +2,10 @@ name: 9-17 scheduler
 
 on:
   schedule:
-    # 매일 00:00 UTC (한국 시간으로 09:00)에 실행 - PC 꺼져있을 때 fallback
-    - cron: '0 0 * * *'
-    # 매일 08:00 UTC (한국 시간으로 17:00)에 실행 - PC 꺼져있을 때 fallback
-    - cron: '0 8 * * *'
+    # 매일 22:02 UTC (한국 시간으로 07:02)에 실행 - PC 꺼져있을 때 fallback
+    - cron: '2 22 * * *'
+    # 매일 08:00 UTC (한국 시간으로 15:06)에 실행 - PC 꺼져있을 때 fallback
+    - cron: '6 6 * * *'
 
   # 수동 트리거 사용 (Cowork 스케줄러가 PC 켜져있을 때 직접 호출)
   workflow_dispatch:
