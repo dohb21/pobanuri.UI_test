@@ -10,31 +10,6 @@ on:
   # 수동 트리거 사용 (Cowork 스케줄러가 PC 켜져있을 때 직접 호출)
   workflow_dispatch:
 
-jobs:
-  check-trigger:
-    runs-on: ubuntu-latest
-    outputs:
-      skip: ${{ steps.check.outputs.skip }}
-    steps:
-      - name: Skip if already triggered by dispatch within 30 min
-        id: check
-        if: github.event_name == 'schedule'
-        run: |
-          RUNS=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?event=workflow_dispatch&per_page=5")
-          SKIP=$(echo "$RUNS" | python3 -c "
-          import sys, json
-          from datetime import datetime, timezone, timedelta
-          data = json.load(sys.stdin)
-          for run in data.get('workflow_runs', []):
-              t = datetime.fromisoformat(run['created_at'].replace('Z','+00:00'))
-              if (datetime.now(timezone.utc) - t).total_seconds() < 21600:
-                  print('true'); sys.exit()
-          print('false')
-          ")
-          echo "skip=$SKIP" >> $GITHUB_OUTPUT
-
   ui_test_job:
     needs: check-trigger
     if: needs.check-trigger.outputs.skip != 'true'
