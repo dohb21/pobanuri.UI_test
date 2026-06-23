@@ -141,6 +141,9 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
         if login_url == base_url:
             login_url = base_url.rstrip("/") + "/indexLogin"
     try:
+        # 로그인 실패 alert 자동 닫기
+        page.on("dialog", lambda d: d.accept())
+
         page.goto(login_url, wait_until="domcontentloaded", timeout=20000)
         close_popups(page)
 
@@ -150,7 +153,8 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
 
         id_input = page.locator(
             "input[name='id'], input[name='userId'], input[name='loginId'], "
-            "input[name='mb_id'], "
+            "input[name='mb_id'], input[name='loginMemberId'], "
+            "input[name*='Id'], input[name*='id'][type='text'], "
             "input[placeholder*='아이디'], input[placeholder*='ID'], "
             "input[placeholder*='휴대폰'], input[placeholder*='전화번호'], "
             "input[type='tel']"
@@ -161,24 +165,56 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
             return True
 
         pw_input = page.locator("input[type='password']").first
+        id_input.click(timeout=3000)
         id_input.fill(username)
+        pw_input.click(timeout=3000)
         pw_input.fill(password)
 
-        # fn.login() JS 직접 호출 (onclick 버튼 클릭보다 신뢰도 높음)
+        submitted = False
+
+        # 1순위: fn.login() JS 직접 호출
         try:
             page.evaluate("fn.login()")
+            submitted = True
         except Exception:
-            # JS 호출 실패 시 버튼 직접 클릭
-            login_btn = page.locator(
-                "button[onclick*='fn.login'], button#loginButton, button.btn-basicL"
-            ).first
+            pass
+
+        # 2순위: 각종 로그인 버튼 선택자 시도
+        if not submitted:
+            for btn_sel in [
+                "button[onclick*='fn.login']",
+                "button#loginButton",
+                "button.btn-basicL",
+                "button[type='submit']",
+                "input[type='submit']",
+                "button[onclick*='login']",
+                "a[onclick*='login']",
+                "#loginFrm button",
+                "form button[class*='login']",
+                "form input[type='submit']",
+            ]:
+                try:
+                    btn = page.locator(btn_sel).first
+                    if btn.count() > 0 and btn.is_visible(timeout=1500):
+                        btn.click(timeout=3000)
+                        submitted = True
+                        break
+                except Exception:
+                    continue
+
+        # 3순위: JS form.submit()
+        if not submitted:
             try:
-                if login_btn.is_visible(timeout=3000):
-                    login_btn.click()
-                else:
-                    pw_input.press("Enter")
+                page.evaluate(
+                    "() => { const f = document.querySelector('form'); if (f) f.submit(); }"
+                )
+                submitted = True
             except Exception:
-                pw_input.press("Enter")
+                pass
+
+        # 4순위: Enter 키
+        if not submitted:
+            pw_input.press("Enter")
 
         # 로그인 후 URL이 login 을 벗어날 때까지 대기
         try:

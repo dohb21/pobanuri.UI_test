@@ -41,13 +41,18 @@ malls:
       pc: "https://samaint.onuri.co.kr/"
       mobile: "https://msamaint.onuri.co.kr/"
     requires_login: true
+    search_valid:
+      - 수건
+      - 텀블러
+      - 가방
+      - 옷
+      - 신발
+      - 생수
+      - 물
+      - 김치
+      - 떡
     categories:
-      - 가구/인테리어
-      - 가전/디지털
-      - 문구/취미/펫
-      - 뷰티
       - 생활/건강
-      - 스포츠/레저/자동차
       - 식품
       - 의류
       - 잡화

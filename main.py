@@ -35,7 +35,7 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
 
     username = os.environ.get("ID", "")
     password = os.environ.get("PASSWORD", "")
-    valid_kws = cfg["search"]["valid"]
+    valid_kws = mall.get("search_valid") or cfg["search"]["valid"]
     cat_pool = mall.get("categories") or cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
 
