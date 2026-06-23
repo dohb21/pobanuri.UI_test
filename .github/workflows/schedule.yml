@@ -32,6 +32,7 @@ jobs:
           ID: ${{ secrets.ID }}
           PASSWORD: ${{ secrets.PASSWORD }}
           DOORAY_WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          MAX_WORKERS: 1
         run: |
           python main.py
 

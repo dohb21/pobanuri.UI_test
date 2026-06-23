@@ -147,8 +147,9 @@ def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
     args_list = [(mall, cfg, headless) for mall in malls]
 
     all_results = []
-    # 2개씩 병렬 실행: 동시 로그인 수 제한으로 SSO 세션 충돌 방지
-    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+    # MAX_WORKERS 환경변수로 조절 가능 (CI 환경에서 1로 설정 시 순차 실행)
+    max_workers = int(os.environ.get("MAX_WORKERS", "2"))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(_run_mall_worker, args): args[0]["name"] for args in args_list}
         for future in concurrent.futures.as_completed(futures):
             mall_name = futures[future]
