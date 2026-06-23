@@ -305,6 +305,10 @@ def _pc_cart_flow(page: Page) -> tuple:
 
     if detail_btn:
         print(f"  [PC 장바구니] 상세 장바구니 버튼 발견, 옵션 선택 시도")
+        try:
+            page.wait_for_selector(".optSelectWrap", timeout=3000)
+        except Exception:
+            pass
         ok_opt = _select_first_option(page)
         wrap_cnt = page.locator(".optSelectWrap").count()
         print(f"  [PC 장바구니] 옵션 그룹 {wrap_cnt}개, 선택 {'성공' if ok_opt else '실패/없음'}")

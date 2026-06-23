@@ -5,9 +5,8 @@ on:
     - cron: '7 */3 * * *'
   workflow_dispatch:
 
+jobs:
   ui_test_job:
-    needs: check-trigger
-    if: needs.check-trigger.outputs.skip != 'true'
     runs-on: ubuntu-latest
 
     steps:
