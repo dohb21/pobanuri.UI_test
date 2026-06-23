@@ -141,9 +141,6 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
         if login_url == base_url:
             login_url = base_url.rstrip("/") + "/indexLogin"
     try:
-        # 로그인 실패 alert 자동 닫기
-        page.on("dialog", lambda d: d.accept())
-
         page.goto(login_url, wait_until="domcontentloaded", timeout=20000)
         close_popups(page)
 
