@@ -122,7 +122,7 @@ def _modal_is_open(page: Page) -> bool:
                 const s = window.getComputedStyle(el);
                 if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') return false;
                 const z = parseInt(s.zIndex, 10);
-                if (!z || z < 100) return false;
+                if (!z || z < 50) return false;
                 if (el.offsetWidth < 200 || el.offsetHeight < 100) return false;
                 const cls = ((el.className && el.className.toString()) || '') + ' ' + (el.id || '');
                 return /layer|popup|modal|overlay|dimm|exhibition|installment|category/i.test(cls);
@@ -199,9 +199,9 @@ def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tu
             pass
         el.click(timeout=5000, force=is_mobile)
 
-        # 모달 오픈 또는 URL 변경 대기 (최대 2.5초)
+        # 모달 오픈 또는 URL 변경 대기
         try:
-            page.wait_for_selector(MODAL_WAIT_SELECTOR, timeout=2500)
+            page.wait_for_selector(MODAL_WAIT_SELECTOR, timeout=4000)
         except Exception:
             pass
 

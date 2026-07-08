@@ -81,7 +81,7 @@ def _count_cart_items(page: Page, base_url: str = "") -> int:
                     .then(d => typeof d.cartCnt !== 'undefined' ? d.cartCnt : -1)
                     .catch(() => -1);
             }""", base)
-            if isinstance(count, (int, float)) and count >= 0:
+            if isinstance(count, (int, float)) and count > 0:
                 return int(count)
         except Exception:
             pass
@@ -636,6 +636,12 @@ def run(page: Page, url: str, username: str, password: str, mobile: bool = False
             pass
 
         item_count = _count_cart_items(page, url)
+        if item_count == 0:
+            try:
+                page.wait_for_selector(", ".join(CART_ITEM_SELECTORS[:4]), timeout=5000)
+            except Exception:
+                pass
+            item_count = _count_cart_items(page, url)
         print(f"  [장바구니 확인] 사전 {initial_count}개 → 사후 {item_count}개")
 
         assert item_count > initial_count, (

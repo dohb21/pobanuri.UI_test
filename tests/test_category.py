@@ -6,8 +6,36 @@ from .base import close_popups
 def _open_and_click_category_pc(page: Page, category: str) -> bool:
     """PC: categoryOpen() → 대분류 클릭 → 중분류 첫 항목 클릭"""
     try:
-        page.evaluate("categoryOpen()")
-        page.wait_for_selector(".category-box.on", timeout=5000)
+        # categoryOpen() 호출 — 함수 없으면 직접 버튼 클릭으로 대체
+        try:
+            page.evaluate("categoryOpen()")
+        except Exception:
+            for btn_sel in [
+                "a[href*='categoryOpen']", "a[onclick*='categoryOpen']",
+                "button[onclick*='categoryOpen']",
+            ]:
+                try:
+                    el = page.locator(btn_sel).first
+                    if el.is_visible(timeout=1000):
+                        el.click(timeout=2000)
+                        break
+                except Exception:
+                    continue
+
+        # 카테고리 모달 열림 대기 — 몰마다 .on 클래스 이름이 다를 수 있음
+        for open_sel in [
+            ".category-box.on",
+            ".category-box.active",
+            ".category-box.open",
+            "[class*='categoryLayer']:not([style*='display: none'])",
+            "[class*='categoryWrap'].on",
+            "#category_depth1 ul",
+        ]:
+            try:
+                page.wait_for_selector(open_sel, timeout=2000)
+                break
+            except Exception:
+                continue
 
         cat_link = page.locator("#category_depth1 ul.group").get_by_text(category, exact=True)
         if cat_link.count() == 0:
