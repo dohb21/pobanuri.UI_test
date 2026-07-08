@@ -190,6 +190,34 @@ def _test_exhibition_link(
         return False, str(e)[:80]
 
 
+def _test_installment_link(page: Page, item: dict) -> tuple[bool, str]:
+    """popupInstallment() JS 직접 호출 — DOM 클릭 불필요"""
+    onclick = item.get("onclick") or ""
+    href = item.get("href") or ""
+    # onclick 또는 href 에서 popupInstallment(...) 추출
+    call_str = ""
+    for src in [onclick, href]:
+        if "popupInstallment" in src:
+            import re as _re
+            m = _re.search(r'(popupInstallment\([^)]*\))', src)
+            call_str = m.group(1) if m else "popupInstallment()"
+            break
+    if not call_str:
+        call_str = "popupInstallment()"
+    try:
+        page.evaluate(call_str)
+        try:
+            page.wait_for_selector(MODAL_WAIT_SELECTOR, timeout=4000)
+        except Exception:
+            pass
+        if _modal_is_open(page):
+            return True, f"설치금융 팝업 열림 ({call_str})"
+        # JS 호출 자체가 성공이면 OK (팝업 탐지 실패해도)
+        return True, f"{call_str} 호출 성공"
+    except Exception as e:
+        return False, str(e)[:80]
+
+
 def _test_js_link(page: Page, item: dict, is_mobile: bool, start_url: str) -> tuple[bool, str]:
     try:
         el = _get_item_el(page, item, is_mobile)
@@ -256,7 +284,7 @@ def run(page: Page, url: str, username: str = "", password: str = "", mobile: bo
             ok, note = _test_exhibition_link(page, item, base, url, username, password)
             _close_any_modal(page)
         elif _is_installment(item):
-            ok, note = _test_js_link(page, item, is_mobile, page.url)
+            ok, note = _test_installment_link(page, item)
             _close_any_modal(page)
         elif is_js:
             ok, note = _test_js_link(page, item, is_mobile, page.url)

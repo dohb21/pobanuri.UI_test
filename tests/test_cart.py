@@ -209,19 +209,21 @@ def _select_first_option(page: Page, container_sel: str = None) -> bool:
         if radio.count() == 0:
             continue
         try:
-            radio.click(timeout=2000, force=True)
+            # JS evaluate 우선 — 이벤트 핸들러까지 정확히 발동
+            radio.evaluate(
+                "el => { el.checked = true;"
+                " el.dispatchEvent(new Event('change', {bubbles:true}));"
+                " if (window.OnnuriGoodsOptionUtil)"
+                " OnnuriGoodsOptionUtil.goodsDtlOptionClick(el); }"
+            )
             selected = True
         except Exception:
             try:
-                container.click(timeout=2000)
+                radio.click(timeout=2000, force=True)
                 selected = True
             except Exception:
                 try:
-                    radio.evaluate(
-                        "el => { el.checked = true;"
-                        " if (window.OnnuriGoodsOptionUtil)"
-                        " OnnuriGoodsOptionUtil.goodsDtlOptionClick(el); }"
-                    )
+                    container.click(timeout=2000)
                     selected = True
                 except Exception:
                     continue

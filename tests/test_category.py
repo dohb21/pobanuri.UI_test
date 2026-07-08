@@ -37,13 +37,33 @@ def _open_and_click_category_pc(page: Page, category: str) -> bool:
             except Exception:
                 continue
 
-        cat_link = page.locator("#category_depth1 ul.group").get_by_text(category, exact=True)
-        if cat_link.count() == 0:
-            cat_link = page.locator(".category-box").get_by_text(category, exact=True)
-        # 정확 일치 실패 시 첫 세그먼트로 부분 일치 시도 (예: '스포츠/레저/자동차' → '스포츠')
-        if cat_link.count() == 0:
-            short = category.split("/")[0]
-            cat_link = page.locator(".category-box").filter(has_text=short)
+        short = category.split("/")[0]
+        cat_link = None
+        for cat_scope in [
+            "#category_depth1 ul.group",
+            ".category-box",
+            "#allCateWrap",
+            "#cateLayer",
+            "[class*='cateMenu']",
+            "[class*='allCate']",
+            "[class*='categoryList']",
+            "body",
+        ]:
+            try:
+                # 정확 일치 우선, 실패 시 첫 세그먼트 부분 일치
+                el = page.locator(cat_scope).get_by_text(category, exact=True)
+                if el.count() == 0:
+                    el = page.locator(f"{cat_scope} a").filter(has_text=short)
+                if el.count() > 0:
+                    cat_link = el
+                    break
+            except Exception:
+                continue
+
+        if cat_link is None or cat_link.count() == 0:
+            # 최후 수단: 페이지 전체에서 visible a 태그 텍스트 탐색
+            cat_link = page.locator(f"a:visible").filter(has_text=short)
+
         cat_link.first.click(timeout=5000)
 
         # 중분류(depth2) 나타날 때까지 대기
