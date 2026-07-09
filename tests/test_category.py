@@ -202,6 +202,8 @@ def _open_and_click_category_mobile(page: Page, category: str, d2_idx: int = 0) 
             "[onclick*='fn_totalMenuToggle']",
             "img[onclick*='fn_totalMenuToggle']",
             "button[onclick*='fn_totalMenuToggle']",
+            ".dev-side-menuView-btn",
+            "[class*='side-menuView']",
             "[class*='btnAllMenu']", "[class*='btn-all-menu']",
             "[class*='btn_all']", "button[class*='menu']",
         ]:
