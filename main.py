@@ -39,6 +39,11 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
     cat_pool = mall.get("categories") or cfg["categories"]["pool"]
     cat_count = cfg["categories"]["count"]
 
+    only = set(os.environ.get("_ONLY_TESTS", "").split(",")) - {""}
+
+    def _should_run(name: str) -> bool:
+        return not only or name in only
+
     results = []
     browser, context, page = init_browser(playwright, mobile=mobile, headless=headless)
 
@@ -50,66 +55,74 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
             print("[완료]" if ok else "[실패] 로그인 실패, 계속 진행")
 
         # 1. 메인 화면 진입
-        print(f"  [1/8] 메인 화면 진입...", end=" ", flush=True)
-        result = run_test("메인 화면 진입", platform_label, page,
-                         lambda p: test_main.run(p, url))
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("메인 화면 진입"):
+            print(f"  [1/8] 메인 화면 진입...", end=" ", flush=True)
+            result = run_test("메인 화면 진입", platform_label, page,
+                             lambda p: test_main.run(p, url))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 2. 메인 팝업
-        print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
-        result = run_test("메인 팝업 노출", platform_label, page,
-                         lambda p: test_popup.run(p, url), save_all_screenshots=True)
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("메인 팝업 노출"):
+            print(f"  [2/8] 메인 팝업 노출...", end=" ", flush=True)
+            result = run_test("메인 팝업 노출", platform_label, page,
+                             lambda p: test_popup.run(p, url), save_all_screenshots=True)
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 3. 검색
-        print(f"  [3/8] 검색 기능...", end=" ", flush=True)
-        result = run_test("검색 기능", platform_label, page,
-                         lambda p: test_search.run(p, url, valid_kws))
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("검색 기능"):
+            print(f"  [3/8] 검색 기능...", end=" ", flush=True)
+            result = run_test("검색 기능", platform_label, page,
+                             lambda p: test_search.run(p, url, valid_kws))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 4. 카테고리
-        print(f"  [4/8] 카테고리 상품 노출...", end=" ", flush=True)
-        result = run_test("카테고리 상품 노출", platform_label, page,
-                         lambda p: test_category.run(p, url, cat_pool, cat_count, mobile))
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("카테고리 상품 노출"):
+            print(f"  [4/8] 카테고리 상품 노출...", end=" ", flush=True)
+            result = run_test("카테고리 상품 노출", platform_label, page,
+                             lambda p: test_category.run(p, url, cat_pool, cat_count, mobile))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 5. GNB 메뉴
-        print(f"  [5/8] GNB 메뉴 진입...", end=" ", flush=True)
-        result = run_test("GNB 메뉴 진입", platform_label, page,
-                         lambda p: test_gnb.run(p, url, username, password, mobile=mobile))
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("GNB 메뉴 진입"):
+            print(f"  [5/8] GNB 메뉴 진입...", end=" ", flush=True)
+            result = run_test("GNB 메뉴 진입", platform_label, page,
+                             lambda p: test_gnb.run(p, url, username, password, mobile=mobile))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 6. 인기상품
-        print(f"  [6/8] 하단 인기상품 목록...", end=" ", flush=True)
-        result = run_test("하단 인기상품 목록", platform_label, page,
-                         lambda p: test_popular.run(p, url))
-        results.append(result)
-        print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+        if _should_run("하단 인기상품 목록"):
+            print(f"  [6/8] 하단 인기상품 목록...", end=" ", flush=True)
+            result = run_test("하단 인기상품 목록", platform_label, page,
+                             lambda p: test_popular.run(p, url))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
 
         # 7. 장바구니 (계정이 있을 때만)
-        if username:
-            print(f"  [7/8] 장바구니 담기...", end=" ", flush=True)
-            result = run_test("장바구니 담기", platform_label, page,
-                            lambda p: test_cart.run(p, url, username, password, mobile=mobile))
-            results.append(result)
-            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
-        else:
-            print(f"  [7/8] 장바구니 담기... ⊘ (계정 없음)")
+        if _should_run("장바구니 담기"):
+            if username:
+                print(f"  [7/8] 장바구니 담기...", end=" ", flush=True)
+                result = run_test("장바구니 담기", platform_label, page,
+                                lambda p: test_cart.run(p, url, username, password, mobile=mobile))
+                results.append(result)
+                print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+            else:
+                print(f"  [7/8] 장바구니 담기... ⊘ (계정 없음)")
 
         # 8. 배송지 등록 (계정이 있을 때만)
-        if username:
-            print(f"  [8/8] 배송지 등록 양식...", end=" ", flush=True)
-            result = run_test("배송지 등록 양식", platform_label, page,
-                            lambda p: test_shipping.run(p, url, username, password))
-            results.append(result)
-            print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
-        else:
-            print(f"  [8/8] 배송지 등록 양식... ⊘ (계정 없음)")
+        if _should_run("배송지 등록 양식"):
+            if username:
+                print(f"  [8/8] 배송지 등록 양식...", end=" ", flush=True)
+                result = run_test("배송지 등록 양식", platform_label, page,
+                                lambda p: test_shipping.run(p, url, username, password))
+                results.append(result)
+                print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
+            else:
+                print(f"  [8/8] 배송지 등록 양식... ⊘ (계정 없음)")
 
     finally:
         browser.close()
@@ -181,6 +194,26 @@ def cleanup_old_files(base_dir: str, days: int = 7):
 
 def main():
     headless = "--show" not in sys.argv
+    only_tests = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--only="):
+            only_tests = set(arg[len("--only="):].split(","))
+        elif arg == "--only" and sys.argv.index(arg) + 1 < len(sys.argv):
+            only_tests = set(sys.argv[sys.argv.index(arg) + 1].split(","))
+
+    _TEST_ALIAS = {
+        "검색": "검색 기능", "search": "검색 기능",
+        "카테고리": "카테고리 상품 노출", "category": "카테고리 상품 노출",
+        "gnb": "GNB 메뉴 진입", "메뉴": "GNB 메뉴 진입",
+        "장바구니": "장바구니 담기", "cart": "장바구니 담기",
+        "팝업": "메인 팝업 노출", "popup": "메인 팝업 노출",
+        "메인": "메인 화면 진입", "main": "메인 화면 진입",
+        "인기상품": "하단 인기상품 목록", "popular": "하단 인기상품 목록",
+        "배송지": "배송지 등록 양식", "shipping": "배송지 등록 양식",
+    }
+    if only_tests:
+        only_tests = {_TEST_ALIAS.get(t, t) for t in only_tests}
+        os.environ["_ONLY_TESTS"] = ",".join(only_tests)
     start = time.time()
     print("\n" + "=" * 60)
     print(f"커머스/온누리몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")

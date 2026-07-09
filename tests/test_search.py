@@ -68,9 +68,12 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
             inp.fill(keyword)
             inp.press("Enter")
             try:
-                page.wait_for_load_state("domcontentloaded", timeout=10000)
+                page.wait_for_url(f"**{SEARCH_RESULT_PATH}**", timeout=12000)
             except Exception:
-                pass
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -79,7 +82,7 @@ def _do_search(page: Page, url: str, keyword: str, first_search: bool = True):
         base = url.replace("/main", "").rstrip("/")
         encoded = urllib.parse.quote(keyword)
         search_url = f"{base}{SEARCH_RESULT_PATH}?{SEARCH_HIDDEN_PARAMS}&searchQuery={encoded}"
-        page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
+        page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
 
     # AJAX 결과 로드 대기 (#searchUnitList 가 채워질 때까지)
     try:
