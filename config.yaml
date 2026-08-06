@@ -79,10 +79,9 @@ malls:
   - name: "welfare(castdream)"
     id: castdream
     urls:
-      pc: "https://mcastdream.onuri.co.kr/"
-      mobile: "https://castdream.onuri.co.kr/"
-    requires_login: false
-    skip: true
+      pc: "https://castdream.onuri.co.kr/"
+      mobile: "https://mcastdream.onuri.co.kr/"
+    requires_welfare_sso: true
     categories:
       - 가구/인테리어
       - 가전/디지털

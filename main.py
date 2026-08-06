@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-from tests.base import KST, TestResult, init_browser, run_test, login, now_kst
-from tests import test_main, test_popup, test_search, test_category, test_gnb, test_popular, test_cart, test_shipping
+from tests.base import KST, TestResult, init_browser, run_test, login, now_kst, welfare_sso_login
+from tests import test_main, test_popup, test_search, test_category, test_gnb, test_popular, test_cart, test_shipping, test_exhibition
 from report.generator import build_report, build_simple_message
 from report.dooray import send as dooray_send
 
@@ -44,12 +44,27 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
     def _should_run(name: str) -> bool:
         return not only or name in only
 
+    requires_welfare_sso = mall.get("requires_welfare_sso", False)
     results = []
     browser, context, page = init_browser(playwright, mobile=mobile, headless=headless)
 
     try:
+        # welfare SSO 인증 (castdream 등)
+        if requires_welfare_sso:
+            welfare_url = os.environ.get("WELFARE_URL", "https://welfare.castis.xyz/")
+            welfare_id = os.environ.get("WELFARE_ID", "")
+            welfare_pw = os.environ.get("WELFARE_PASSWORD", "")
+            print(f"  [welfare SSO] {mall_name} SSO 로그인 시도...", end=" ", flush=True)
+            sso_page = welfare_sso_login(context, page, welfare_url, welfare_id, welfare_pw)
+            if sso_page:
+                page = sso_page
+                print("[완료]")
+            else:
+                print("[실패] SSO 로그인 실패, 테스트 스킵")
+                return results
+
         # 로그인이 필요한 몰: 테스트 시작 전 로그인
-        if requires_login and username:
+        elif requires_login and username:
             print(f"  [로그인] {mall_name} 로그인 시도...", end=" ", flush=True)
             ok = login(page, url, username, password, login_url=explicit_login_url)
             print("[완료]" if ok else "[실패] 로그인 실패, 계속 진행")
@@ -116,13 +131,21 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
         # 8. 배송지 등록 (계정이 있을 때만)
         if _should_run("배송지 등록 양식"):
             if username:
-                print(f"  [8/8] 배송지 등록 양식...", end=" ", flush=True)
+                print(f"  [8/9] 배송지 등록 양식...", end=" ", flush=True)
                 result = run_test("배송지 등록 양식", platform_label, page,
                                 lambda p: test_shipping.run(p, url, username, password))
                 results.append(result)
                 print("[완료]" if result.passed else f"[실패] {result.error_msg[:30]}")
             else:
-                print(f"  [8/8] 배송지 등록 양식... ⊘ (계정 없음)")
+                print(f"  [8/9] 배송지 등록 양식... ⊘ (계정 없음)")
+
+        # 9. 기획전 오류 페이지 확인
+        if _should_run("기획전 오류 확인"):
+            print(f"  [9/9] 기획전 오류 확인...", end=" ", flush=True)
+            result = run_test("기획전 오류 확인", platform_label, page,
+                             lambda p: test_exhibition.run(p, url, username, password, mobile=mobile))
+            results.append(result)
+            print("[완료]" if result.passed else f"[실패] {result.error_msg[:60]}")
 
     finally:
         browser.close()
@@ -156,7 +179,13 @@ def _run_mall_worker(args: tuple) -> list[TestResult]:
 
 
 def run_all(cfg: dict, headless: bool = True) -> list[TestResult]:
+    only_malls = set(os.environ.get("_ONLY_MALLS", "").split(",")) - {""}
     malls = [m for m in cfg.get("malls", []) if not m.get("skip", False)]
+    if only_malls:
+        malls = [m for m in malls if any(
+            kw.lower() in m["name"].lower() or kw.lower() in m.get("id", "").lower()
+            for kw in only_malls
+        )]
     args_list = [(mall, cfg, headless) for mall in malls]
 
     all_results = []
@@ -195,11 +224,16 @@ def cleanup_old_files(base_dir: str, days: int = 7):
 def main():
     headless = "--show" not in sys.argv
     only_tests = None
-    for arg in sys.argv[1:]:
+    only_malls = None
+    for i, arg in enumerate(sys.argv[1:], 1):
         if arg.startswith("--only="):
             only_tests = set(arg[len("--only="):].split(","))
-        elif arg == "--only" and sys.argv.index(arg) + 1 < len(sys.argv):
-            only_tests = set(sys.argv[sys.argv.index(arg) + 1].split(","))
+        elif arg == "--only" and i < len(sys.argv) - 1:
+            only_tests = set(sys.argv[i + 1].split(","))
+        elif arg.startswith("--mall="):
+            only_malls = set(arg[len("--mall="):].split(","))
+        elif arg == "--mall" and i < len(sys.argv) - 1:
+            only_malls = set(sys.argv[i + 1].split(","))
 
     _TEST_ALIAS = {
         "검색": "검색 기능", "search": "검색 기능",
@@ -210,10 +244,13 @@ def main():
         "메인": "메인 화면 진입", "main": "메인 화면 진입",
         "인기상품": "하단 인기상품 목록", "popular": "하단 인기상품 목록",
         "배송지": "배송지 등록 양식", "shipping": "배송지 등록 양식",
+        "기획전": "기획전 오류 확인", "exhibition": "기획전 오류 확인",
     }
     if only_tests:
         only_tests = {_TEST_ALIAS.get(t, t) for t in only_tests}
         os.environ["_ONLY_TESTS"] = ",".join(only_tests)
+    if only_malls:
+        os.environ["_ONLY_MALLS"] = ",".join(only_malls)
     start = time.time()
     print("\n" + "=" * 60)
     print(f"커머스/온누리몰 UI 테스트 시작: {now_kst().strftime('%Y-%m-%d %H:%M:%S')} (KST)")
