@@ -6,14 +6,11 @@ malls:
       mobile: "https://mdream.onuri.co.kr/main"
     requires_login: true
     categories:
-      - 가구/인테리어
       - 가전/디지털
       - 문구/취미/펫
       - 뷰티
       - 생활/건강
-      - 스포츠/레저/자동차
       - 식품
-      - 잡화
 
 
   - name: "행정공제회(poba)"
@@ -33,7 +30,6 @@ malls:
       - 식품
       - 의류
       - 잡화
-      - 출산/육아
 
   - name: "삼아(samaint)"
     id: sama
@@ -52,11 +48,15 @@ malls:
       - 김치
       - 떡
     categories:
+      - 가구/인테리어
+      - 가전/디지털
+      - 문구/취미/펫
+      - 뷰티
       - 생활/건강
+      - 스포츠/레저/자동차
       - 식품
       - 의류
       - 잡화
-      - 출산/육아
 
   - name: "교직원공제회(thek)"
     id: thek
@@ -74,7 +74,6 @@ malls:
       - 식품
       - 의류
       - 잡화
-      - 출산/육아
 
   - name: "welfare(castdream)"
     id: castdream
@@ -92,7 +91,6 @@ malls:
       - 식품
       - 의류
       - 잡화
-      - 출산/육아
 
 search:
   valid:
