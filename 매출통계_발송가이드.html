@@ -127,7 +127,7 @@ footer { margin-top: 60px; border-top: 1px solid var(--border); padding-top: 14p
   <h2><span class="n">1</span>전체 흐름</h2>
   <p>Admin_stat은 관리자 화면에 Selenium으로 로그인해서 세션 쿠키를 얻고, 그 쿠키로 관리자 내부 API를 직접 호출합니다. 매출 숫자는 관리자 서버의 <code>salesStatsGrid</code> 쿼리가 계산하고, Admin_stat은 결과를 표로 꾸며 메일로 보내기만 합니다.</p>
   <div class="flow">
-    <div class="step"><b>1. 실행</b>GitHub Actions(월요일 주간 · 1일 월간) 또는 로컬 수동 실행</div>
+    <div class="step"><b>1. 실행</b>GitHub Actions(매일) 또는 로컬 수동 실행</div>
     <div class="step"><b>2. 로그인</b>Selenium으로 B2C·B2B 관리자 로그인, 쿠키 확보</div>
     <div class="step"><b>3. API 호출</b><code>/statistics/salesStatsGrid.do</code></div>
     <div class="step"><b>4. 쿼리</b><code>Statistics.xml</code> <code>salesStatsGrid</code></div>
@@ -139,25 +139,25 @@ footer { margin-top: 60px; border-top: 1px solid var(--border); padding-top: 14p
     <tr><td>매출 계산</td><td><code>pobaonuri/11.business/resources/biz/app/statistics/Statistics.xml</code> (<code>salesStatsGrid</code>)</td><td>매출·주문수·구매자·재구매 지표 계산</td></tr>
     <tr><td>수집·발송</td><td><code>admin_stat/main.py</code></td><td>로그인, API 호출, 엑셀 다운로드, 메일 발송</td></tr>
     <tr><td>메일 본문</td><td><code>admin_stat/report/sales.py</code></td><td>표 HTML 생성, 엑셀 첨부</td></tr>
-    <tr><td>스케줄</td><td><code>.github/workflows/admin_stat.yml</code></td><td>월요일 주간(<code>--sales-weekly</code>), 매월 1일 월간(<code>--sales-monthly</code>) 매출 메일 발송. 현재 자동 실행은 주석 처리</td></tr>
+    <tr><td>스케줄</td><td><code>.github/workflows/admin_stat.yml</code></td><td>매일 실행. 매일 Admin 통계 리포트, 월요일·1일엔 매출 메일을 추가로 발송. 현재 자동 실행은 주석 처리</td></tr>
   </table></div>
 </section>
 
 <section id="run">
   <h2><span class="n">2</span>실행 방법과 스케줄</h2>
   <h3>자동 실행 (GitHub Actions)</h3>
-  <p>워크플로 <b>드림몰 Admin 통계</b>(<code>.github/workflows/admin_stat.yml</code>)가 <code>admin_stat/</code> 폴더 안에서 매출 통계 메일만 보냅니다. 일일 Admin 리포트는 보내지 않습니다.</p>
+  <p>워크플로 <b>드림몰 Admin 통계</b>(<code>.github/workflows/admin_stat.yml</code>)가 매일 23:02 UTC(08:02 KST)에 <code>admin_stat/</code> 폴더 안에서 <code>python main.py</code>를 실행합니다. 한 번 실행으로 메일이 두 종류 나갑니다.</p>
   <div class="tbl"><table>
-    <tr><th>메일</th><th>실행 시각</th><th>실행 명령</th><th>집계 기간</th></tr>
-    <tr><td>주간 매출 통계</td><td>매주 월요일 09:02 KST (<code>2 0 * * 1</code>)</td><td><code>python main.py --sales-weekly</code></td><td>직전 주 월요일 ~ 일요일</td></tr>
-    <tr><td>월간 매출 통계</td><td>매월 1일 09:02 KST (<code>2 0 1 * *</code>)</td><td><code>python main.py --sales-monthly</code></td><td>직전 달 1일 ~ 말일</td></tr>
+    <tr><th>메일</th><th>보내는 날 (KST)</th><th>집계 기간</th><th>수신자</th></tr>
+    <tr><td><code>[드림몰] Admin 통계 리포트</code> (이메일·카카오톡)</td><td>매일</td><td>전날</td><td><code>EMAIL_TO</code>, 카카오는 <code>KAKAO_TO</code></td></tr>
+    <tr><td>주간 매출 통계</td><td>월요일</td><td>직전 주 월요일 ~ 일요일</td><td><code>SALES_EMAIL_TO</code> (없으면 <code>EMAIL_TO</code>)</td></tr>
+    <tr><td>월간 매출 통계</td><td>매달 1일</td><td>직전 달 1일 ~ 말일</td><td><code>SALES_EMAIL_TO</code> (없으면 <code>EMAIL_TO</code>)</td></tr>
   </table></div>
-  <p class="muted">1일이 월요일이면 두 번 실행되어 주간·월간 두 통이 모두 나갑니다.</p>
+  <p class="muted">월요일이 1일이면 주간·월간 매출 메일이 모두 나갑니다. 요일·날짜 판단은 <code>main.py</code>가 KST 기준으로 합니다.</p>
   <div class="callout info">
     <b>현재는 자동 실행을 꺼 둔 상태</b>
-    <code>admin_stat.yml</code>의 <code>schedule</code>이 주석 처리돼 있어 정해진 시각에 돌지 않습니다. 다시 쓰려면 <code>schedule</code> 주석을 풉니다. 지금은 Actions 화면의 <b>Run workflow</b>에서 <code>weekly</code> / <code>monthly</code>를 골라 수동으로만 실행할 수 있습니다.
+    <code>admin_stat.yml</code>의 <code>schedule</code>이 주석 처리돼 있어 정해진 시각에 돌지 않습니다. 다시 쓰려면 <code>schedule</code> 주석을 풉니다. 지금은 Actions 화면의 <b>Run workflow</b>에서 수동으로만 실행할 수 있습니다: <code>daily</code>(평소와 같은 실행) / <code>weekly</code>·<code>monthly</code>(해당 매출 통계만).
   </div>
-  <p class="muted">옵션 없이 <code>python main.py</code>만 실행하면 일일 Admin 리포트(이메일·카카오톡)를 보내고, 실행한 날이 월요일이면 주간, 1일이면 월간 매출 메일을 함께 보냅니다. 워크플로는 이 방식을 쓰지 않습니다.</p>
 
   <h3>로컬 수동 실행</h3>
   <p><code>admin_stat/</code> 폴더로 이동한 뒤 실행합니다. 레포 루트의 <code>main.py</code>는 UI 테스트용이라 다른 프로그램입니다.</p>
@@ -323,7 +323,7 @@ D.CMS      * (D.RMN_ORD_QTY - D.RTN_QTY) AS CMS        -- 수수료단가 × 유
   <ul>
     <li>B2C·B2B 데이터가 둘 다 비면 그 주기의 메일은 보내지 않고 건너뜁니다.</li>
     <li>B2B 로그인에 실패하면 B2B 표와 엑셀 없이 B2C만 보냅니다. 로그에 <code>[B2B] 로그인 실패</code>가 찍힙니다.</li>
-    <li>집계 기간 계산은 KST 기준입니다. GitHub Actions cron은 UTC라서, 날짜가 KST와 같아지도록 09:02 KST(00:02 UTC)에 실행합니다. 08:02 KST로 두면 1일 실행이 UTC로는 전달 말일이 되어 cron으로 표현할 수 없습니다.</li>
+    <li>스케줄 판단과 기간 계산은 모두 KST 기준입니다. GitHub Actions는 UTC(23:02)로 돌지만 코드가 KST로 변환하므로, 08:02 KST 실행일을 기준으로 월요일·1일을 판단합니다.</li>
     <li>B2C 관리자 접속에 VPN이 필요한 환경이면, GitHub Actions에서는 접속이 안 될 수 있습니다.</li>
   </ul>
 </section>

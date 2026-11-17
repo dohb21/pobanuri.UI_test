@@ -183,7 +183,7 @@ python main.py --mall thek --only gnb --show
 | 워크플로 | 파일 | 실행 주기 | 대상 폴더 |
 |----------|------|-----------|-----------|
 | UI_Test scheduler | `.github/workflows/schedule.yml` | 6시간 간격 | 루트 (`main.py`) |
-| 드림몰 Admin 통계 | `.github/workflows/admin_stat.yml` | 수동 실행만 (자동 실행은 주석 처리) | `admin_stat/` |
+| 드림몰 Admin 통계 | `.github/workflows/admin_stat.yml` | 매일 08:02 KST (현재 자동 실행은 주석 처리, 수동 실행만) | `admin_stat/` |
 
 ### UI_Test scheduler
 
@@ -204,26 +204,29 @@ Repository Secrets에 아래 3개를 등록해야 합니다.
 
 ### 드림몰 Admin 통계
 
-`admin_stat/`의 Selenium 프로그램이 드림몰 Admin 통계를 수집해 이메일(과 설정 시 카카오)로 전송합니다. 워크플로 `드림몰 Admin 통계`는 `admin_stat/` 안에서 `python main.py`를 실행합니다. 현재는 사용하지 않아 자동 실행(`schedule`)을 주석 처리했고 **Actions → 드림몰 Admin 통계 → Run workflow**로 수동 실행만 가능합니다. 다시 쓰려면 `admin_stat.yml`의 `schedule` 주석을 풉니다. 주석을 풀면 아래처럼 매출 통계만 전송합니다(매일 보내던 일간 통계는 보내지 않음).
+`admin_stat/`의 Selenium 프로그램이 드림몰 Admin 통계를 수집해 메일 두 종류를 보냅니다. 워크플로 `드림몰 Admin 통계`는 `admin_stat/` 안에서 실행됩니다. 현재는 사용하지 않아 자동 실행(`schedule`)을 주석 처리했고 **Actions → 드림몰 Admin 통계 → Run workflow**로 수동 실행만 가능합니다. 다시 쓰려면 `admin_stat.yml`의 `schedule` 주석을 풉니다.
 
-| 실행 시각 | 실행 명령 | 내용 |
-|-----------|-----------|------|
-| 매주 월요일 09:02 KST (`2 0 * * 1`) | `python main.py --sales-weekly` | 직전 주 월~일 매출 통계 |
-| 매월 1일 09:02 KST (`2 0 1 * *`) | `python main.py --sales-monthly` | 직전 달 매출 통계 |
+주석을 풀면 매일 23:02 UTC(08:02 KST)에 `python main.py`를 실행하고, 날짜에 따라 아래 메일을 보냅니다.
 
-1일이 월요일이면 두 번 실행되어 주간·월간을 각각 보냅니다. 수동 실행할 때는 `weekly` / `monthly` 중 하나를 고릅니다. 결과물은 `admin-stat-reports` 아티팩트(`admin_stat/reports/`)로 30일간 보관됩니다.
+| 메일 | 보내는 날 | 수신자 |
+|------|-----------|--------|
+| `[드림몰] Admin 통계 리포트` (전날 통계, 이메일·카카오) | 매일 | `EMAIL_TO` (카카오는 `KAKAO_TO`) |
+| `[온누리몰] 주간 매출 통계` | 월요일 | `SALES_EMAIL_TO` (없으면 `EMAIL_TO`) |
+| `[온누리몰] 월간 매출 통계` | 매달 1일 | `SALES_EMAIL_TO` (없으면 `EMAIL_TO`) |
+
+수동 실행할 때는 `daily`(평소와 같은 실행) / `weekly`·`monthly`(해당 매출 통계만) 중 하나를 고릅니다. 결과물은 `admin-stat-reports` 아티팩트(`admin_stat/reports/`)로 30일간 보관됩니다.
 
 Secrets 이름은 로컬 `.env` 키와 **같습니다**. 같은 값을 양쪽에 넣습니다.
 
 | Secret / `.env` 키 | 용도 |
 |--------------------|------|
 | `ADMIN_USER`, `ADMIN_PASS` | Admin 로그인 계정 |
-| `EMAIL_FROM`, `EMAIL_PASSWORD`, `EMAIL_TO` | 보내는 메일 / 앱 비밀번호 / 받는 메일 |
+| `EMAIL_FROM`, `EMAIL_PASSWORD`, `EMAIL_TO` | 보내는 메일 / 앱 비밀번호 / Admin 통계 리포트 수신자 |
 | `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT` | SMTP 서버 / 포트 |
 | `B2B_ADMIN_USER`, `B2B_ADMIN_PASS` | B2B Admin 로그인 계정 |
 | `SALES_EMAIL_TO` | 매출 통계 수신자 (없으면 `EMAIL_TO` 사용) |
 | `LOGIN_USER_FIELD`, `LOGIN_PASS_FIELD` | 로그인 입력칸 이름. 비워 두면 후보 이름을 자동 탐지 |
-| `SOLAPI_API_KEY`, `SOLAPI_API_SECRET`, `SOLAPI_FROM_NUMBER`, `KAKAO_CHANNEL_ID`, `KAKAO_TO` | 카카오 발송용 |
+| `SOLAPI_API_KEY`, `SOLAPI_API_SECRET`, `SOLAPI_FROM_NUMBER`, `KAKAO_CHANNEL_ID`, `KAKAO_TO` | Admin 통계 리포트 카카오 발송용 |
 
 마지막 두 줄은 이전에 Secrets에 등록하지 않고 운영하던 항목입니다. `UI_Test scheduler`의 Secrets(`ID`, `PASSWORD`, `WEBHOOK_URL`)와 이름이 겹치지 않습니다.
 
