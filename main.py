@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-from tests.base import KST, TestResult, init_browser, run_test, login, now_kst, welfare_sso_login
+from tests.base import KST, TestResult, init_browser, run_test, login, now_kst
+# from tests.base import welfare_sso_login  # castdream 점검 중단으로 주석 처리
 from tests import test_main, test_popup, test_search, test_category, test_gnb, test_popular, test_cart, test_shipping, test_exhibition
 from report.generator import build_report, build_simple_message
 from report.dooray import send as dooray_send
@@ -40,31 +41,35 @@ def run_platform(playwright, mall: dict, cfg: dict, mobile: bool, headless: bool
     cat_count = cfg["categories"]["count"]
 
     only = set(os.environ.get("_ONLY_TESTS", "").split(",")) - {""}
+    skip_tests = set(mall.get("skip_tests") or [])
 
     def _should_run(name: str) -> bool:
+        if name in skip_tests:
+            return False
         return not only or name in only
 
-    requires_welfare_sso = mall.get("requires_welfare_sso", False)
+    # requires_welfare_sso = mall.get("requires_welfare_sso", False)  # castdream 점검 중단으로 주석 처리
     results = []
     browser, context, page = init_browser(playwright, mobile=mobile, headless=headless)
 
     try:
-        # welfare SSO 인증 (castdream 등)
-        if requires_welfare_sso:
-            welfare_url = os.environ.get("WELFARE_URL", "https://welfare.castis.xyz/")
-            welfare_id = os.environ.get("WELFARE_ID", "")
-            welfare_pw = os.environ.get("WELFARE_PASSWORD", "")
-            print(f"  [welfare SSO] {mall_name} SSO 로그인 시도...", end=" ", flush=True)
-            sso_page = welfare_sso_login(context, page, welfare_url, welfare_id, welfare_pw)
-            if sso_page:
-                page = sso_page
-                print("[완료]")
-            else:
-                print("[실패] SSO 로그인 실패, 테스트 스킵")
-                return results
+        # welfare SSO 인증 (castdream 점검 중단으로 주석 처리)
+        # if requires_welfare_sso:
+        #     welfare_url = os.environ.get("WELFARE_URL", "https://welfare.castis.xyz/")
+        #     welfare_id = os.environ.get("WELFARE_ID", "")
+        #     welfare_pw = os.environ.get("WELFARE_PASSWORD", "")
+        #     print(f"  [welfare SSO] {mall_name} SSO 로그인 시도...", end=" ", flush=True)
+        #     sso_page = welfare_sso_login(context, page, welfare_url, welfare_id, welfare_pw)
+        #     if sso_page:
+        #         page = sso_page
+        #         print("[완료]")
+        #     else:
+        #         print("[실패] SSO 로그인 실패, 테스트 스킵")
+        #         return results
 
         # 로그인이 필요한 몰: 테스트 시작 전 로그인
-        elif requires_login and username:
+        # (SSO 분기를 주석 처리하면서 elif → if 로 변경)
+        if requires_login and username:
             print(f"  [로그인] {mall_name} 로그인 시도...", end=" ", flush=True)
             ok = login(page, url, username, password, login_url=explicit_login_url)
             print("[완료]" if ok else "[실패] 로그인 실패, 계속 진행")
@@ -263,7 +268,7 @@ def main():
     print("\n[정리 중] 이전 파일 정리...")
     cleanup_old_files(os.path.join(base_dir, "screenshots"))
     cleanup_old_files(os.path.join(base_dir, "reports"))
-    cleanup_old_files(os.path.join(base_dir, "videos"))
+    # cleanup_old_files(os.path.join(base_dir, "videos"))  # 영상 기능 미사용으로 주석 처리
 
     cfg = load_config()
     results = run_all(cfg, headless=headless)

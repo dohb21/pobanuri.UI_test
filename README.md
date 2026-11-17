@@ -1,71 +1,83 @@
-﻿# pobanuri UI 자동화 테스트
+﻿# 온누리몰 UI 자동화 테스트
 
-Playwright 기반의 드림몰(dream.onuri.co.kr) UI 자동화 테스트 도구입니다. 
-PC와 모바일 환경을 동시에 검증하며, 테스트 결과를 스크린샷·영상·마크다운 리포트로 저장합니다.
-
+Playwright 기반의 온누리 계열 몰 UI 자동화 점검 도구입니다.
+몰마다 PC와 모바일 화면을 실제 Chromium 브라우저로 열어 9개 시나리오를 검증하고, 결과를 마크다운 리포트·스크린샷으로 저장하며 두레이 메신저로 요약을 발송합니다.
 
 ---
 
 ## 목차
 
-- [테스트 원리](#테스트-원리)
+- [점검 대상](#점검-대상)
+- [동작 원리](#동작-원리)
 - [테스트 항목](#테스트-항목)
 - [설치 방법](#설치-방법)
 - [설정](#설정)
 - [실행 방법](#실행-방법)
+- [GitHub Actions](#github-actions)
 - [결과물 확인](#결과물-확인)
 - [디렉터리 구조](#디렉터리-구조)
 
 ---
 
-## 테스트 원리
+## 점검 대상
+
+`config.yaml`의 `malls` 목록이 점검 대상입니다.
+
+| 몰 | id | 로그인 |
+|----|----|--------|
+| 드림몰 | `dream` | 필요 |
+| 교직원공제회(thek) | `thek` | 필요 |
+
+---
+
+## 동작 원리
 
 ```
 main.py
-  └─ run_platform() × 2 (PC / Mobile)
-       ├─ Playwright Chromium 브라우저 실행 (headless)
-       ├─ PC: viewport 1280×800
-       ├─ Mobile: Galaxy S5 에뮬레이션
-       └─ 각 테스트 모듈 순차 실행 → TestResult 수집
+  └─ config.yaml 의 malls 로드 (skip: true 인 몰 제외)
+       └─ 몰마다 별도 프로세스로 실행 (동시 실행 수: MAX_WORKERS, 기본 2)
+            └─ PC → Mobile 순서로
+                 ├─ Chromium 실행 (PC 1280×800 / Mobile iPhone 14 Pro Max 에뮬레이션)
+                 ├─ 로그인이 필요한 몰이면 ID / PASSWORD 로 로그인
+                 ├─ 9개 시나리오를 순차 실행 → TestResult 수집
+                 └─ 실패 시 스크린샷 자동 저장
+  └─ reports/report_YYYYMMDD_HHMMSS.md 저장
+  └─ 두레이 웹훅으로 요약 발송 (DOORAY_WEBHOOK_URL 이 설정된 경우)
+  └─ 실패가 1건이라도 있으면 종료 코드 1
 ```
 
-1. **Playwright** 로 실제 Chromium 브라우저를 제어합니다. 실제 브라우저가 페이지를 열고 버튼을 클릭하므로 JS 렌더링, AJAX 응답, 동적 UI를 포함한 실제 사용자 시나리오를 검증합니다.
-2. 각 테스트는 `tests/` 폴더 아래 별도 모듈로 분리되어 있으며, `run(page, ...)` 함수를 통해 호출됩니다.
-3. 테스트 성공 시 `note` 문자열을, 실패 시 `AssertionError` 또는 `Exception` 을 발생시킵니다.
-4. `base.run_test()` 래퍼가 예외를 캐치해 실패 스크린샷을 자동 저장하고 `TestResult` 객체로 통일합니다.
-5. 팝업 테스트는 별도 브라우저 컨텍스트로 **비디오 녹화**까지 수행합니다.
-6. 7일이 지난 스크린샷·리포트·영상은 실행 시 자동 삭제됩니다.
+- 각 시나리오는 `tests/` 아래 별도 모듈이며 `run(page, ...)` 함수로 호출됩니다.
+- 성공하면 비고 문자열을 반환하고, 실패하면 예외를 발생시킵니다.
+- `tests/base.py`의 `run_test()`가 예외를 잡아 실패 스크린샷을 저장하고 결과 객체로 통일합니다.
+- 7일이 지난 스크린샷·리포트는 실행할 때 자동 삭제됩니다.
 
 ---
 
 ## 테스트 항목
 
-PC와 Mobile 각각 아래 8개 시나리오를 순서대로 실행합니다.
-
 | # | 테스트명 | 모듈 | 검증 내용 |
 |---|---------|------|---------|
-| 1 | **메인 화면 진입** | `test_main.py` | 페이지 로드 성공, 타이틀 비어있지 않음, `<body>` 요소 표시 |
-| 2 | **메인 팝업 노출** | `test_popup.py` | 배너 팝업 컨테이너 탐지, Swiper 슬라이드 링크 진입 확인, 닫기 버튼 동작 (스크린샷 + 영상 저장) |
-| 3 | **검색 기능** | `test_search.py` | config의 유효 키워드 중 3개 무작위 선택 → UI 검색 시도 → URL 직접 이동 폴백 → 결과 상품 1개 이상 확인 |
-| 4 | **카테고리 상품 노출** | `test_category.py` | config의 카테고리 풀에서 무작위 N개 선택 → GNB 카테고리 메뉴 진입 → 중분류 클릭 → 상품 목록 1개 이상 확인 |
-| 5 | **GNB 메뉴 진입** | `test_gnb.py` | 상단 네비게이션 메뉴 전체 순회 → 일반 링크·기획전·JS 팝업·할부 팝업 유형별 분기 → 페이지 이동 또는 모달 열림 확인 |
-| 6 | **하단 인기상품 목록** | `test_popular.py` | 메인 하단 `div.section.sec_6` 섹션 존재 확인, 카테고리 탭 및 상품 목록 로드 확인 |
-| 7 | **장바구니 담기** | `test_cart.py` | 로그인 → 사전 장바구니 비우기 → 인기상품 "장바구니 담기" 클릭 → 옵션 선택 → 장바구니 항목 수 증가 확인 → "주문하기" 클릭 → 결제 페이지 이동 확인 → 사후 비우기 |
-| 8 | **배송지 등록 양식** | `test_shipping.py` | 로그인 → 배송지 관리 페이지 진입 → "배송지 추가" 클릭 → 팝업 폼 필드(이름·전화·우편번호·주소) 입력 가능 여부 확인 |
+| 1 | 메인 화면 진입 | `test_main.py` | 페이지 로드, 타이틀·`<body>` 표시 |
+| 2 | 메인 팝업 노출 | `test_popup.py` | 배너 팝업 탐지, 슬라이드 링크 진입, 닫기 동작 |
+| 3 | 검색 기능 | `test_search.py` | 유효 키워드 풀에서 무작위 선택 → 검색 결과 상품 1개 이상 |
+| 4 | 카테고리 상품 노출 | `test_category.py` | 카테고리 풀에서 무작위 N개 선택 → 메뉴 진입 → 상품 목록 1개 이상 |
+| 5 | GNB 메뉴 진입 | `test_gnb.py` | 상단 메뉴 전체 순회, 페이지 이동 또는 모달 열림 확인 |
+| 6 | 하단 인기상품 목록 | `test_popular.py` | 메인 하단 `div.section.sec_6`의 탭과 상품 목록(`#searchUnitList li`) 로드 |
+| 7 | 장바구니 담기 | `test_cart.py` | 장바구니 비우기 → 인기상품 담기 → 주문하기로 주문 페이지 진입 확인 → 다시 비우기 |
+| 8 | 배송지 등록 양식 | `test_shipping.py` | 배송지 추가 팝업이 열리고 입력 필드가 동작하는지 확인 (저장하지 않음) |
+| 9 | 기획전 오류 확인 | `test_exhibition.py` | 기획전 상세 페이지가 오류 코드(PRD0001~0003) 화면이 아닌지 확인. 기획전이 없으면 통과(스킵) |
 
-> 7·8번은 `.env`의 `ACCOUNT_USERNAME`이 설정된 경우에만 실행됩니다.
+- 7·8번은 `ID`가 설정된 경우에만 실행됩니다.
+- 7번은 **테스트 계정의 장바구니를 시작과 끝에 비웁니다.** 전용 테스트 계정을 사용하세요.
 
 ---
 
 ## 설치 방법
 
-**Python 3.11 이상** 필요
+Python 3.11 이상이 필요합니다.
 
 ```bash
-# 의존성 설치
 pip install -r requirements.txt
-
-# Playwright 브라우저 설치
 playwright install chromium
 ```
 
@@ -73,86 +85,111 @@ playwright install chromium
 
 ## 설정
 
-설정은 `config.yaml`(테스트 동작)과 `.env`(민감 정보) 두 파일로 분리 관리합니다.
+설정은 `config.yaml`(테스트 동작)과 `.env`(민감 정보) 두 곳으로 분리합니다.
 
-### config.yaml — 테스트 동작 설정
+### config.yaml
 
 ```yaml
-urls:
-  pc: "https://dream.onuri.co.kr/main"       # PC 테스트 URL
-  mobile: "https://mdream.onuri.co.kr/main"  # 모바일 테스트 URL
+malls:
+  - name: "드림몰"
+    id: dream
+    urls:
+      pc: "https://dream.onuri.co.kr/main"
+      mobile: "https://mdream.onuri.co.kr/main"
+    requires_login: true
+    categories:               # 이 몰 전용 카테고리 (없으면 categories.pool 사용)
+      - 가전/디지털
+      - 식품
 
 search:
-  valid:                # 검색 테스트용 유효 키워드 풀 (매 실행마다 3개 무작위 선택)
+  valid:                      # 검색 테스트용 키워드 풀 (실행마다 무작위 선택)
     - 생수
     - 수건
-    # ...
 
 categories:
-  pool:                 # 카테고리 테스트 대상 풀
+  pool:                       # 카테고리 테스트 기본 풀
     - 가전/디지털
     - 식품
-    # ...
-  count: 5              # 풀에서 무작위로 선택할 카테고리 수
+  count: 5                    # 풀에서 무작위로 뽑는 개수
 
 dooray:
   bot_name: "드림몰 테스트봇"
 ```
 
-### .env — 민감 정보 (git 제외)
+몰 항목에서 쓰는 필드입니다.
+
+| 필드 | 설명 |
+|------|------|
+| `name`, `id` | 리포트에 표시되는 이름 / `--mall` 옵션에서 쓰는 식별자 |
+| `urls.pc`, `urls.mobile` | PC / 모바일 메인 주소 |
+| `requires_login` | `true`이면 `ID`/`PASSWORD`로 로그인 |
+| `login_url` | 로그인 주소가 기본 규칙(`/main` → `/indexLogin`)과 다를 때 지정 |
+| `search_valid` | 이 몰 전용 검색어 (없으면 `search.valid` 사용) |
+| `categories` | 이 몰 전용 카테고리 (없으면 `categories.pool` 사용). 몰에 실제로 있는 카테고리만 적어야 합니다 |
+| `skip` | `true`이면 몰 전체를 점검에서 제외 |
+| `skip_tests` | 이 몰에서만 제외할 시나리오 이름 목록 (예: `하단 인기상품 목록`, `장바구니 담기`) |
+
+### .env (git 제외, 로컬 전용)
 
 ```env
-ACCOUNT_USERNAME=아이디       # 장바구니·배송지 테스트에 사용 (없으면 두 항목 스킵)
-ACCOUNT_PASSWORD=비밀번호
-DOORAY_WEBHOOK_URL=https://...
+ID=테스트계정아이디
+PASSWORD=테스트계정비밀번호
+DOORAY_WEBHOOK_URL=
 ```
 
-> GitHub Actions에서는 `.env` 대신 Repository Secrets(`username`, `password`, `WEBHOOK_URL`)로 관리합니다.
+| 키 | 용도 |
+|----|------|
+| `ID`, `PASSWORD` | 로그인이 필요한 모든 몰이 공용으로 쓰는 테스트 계정 |
+| `DOORAY_WEBHOOK_URL` | 두레이 웹훅. 비워 두면 발송하지 않음 |
+
+`.env` 값은 이미 설정된 시스템 환경변수보다 우선합니다.
 
 ---
 
 ## 실행 방법
 
-### 기본 실행 (브라우저 숨김, headless)
-
 ```bash
-python main.py
+python main.py                              # 전체 몰, 전체 시나리오 (headless)
+python main.py --show                       # 브라우저 창을 띄워서 실행
+python main.py --mall dream                 # 특정 몰만 (id 또는 이름 일부, 대소문자 무관)
+python main.py --only 검색,cart             # 특정 시나리오만
+python main.py --mall thek --only gnb --show
 ```
 
-### 브라우저 화면 표시하며 실행
+`--only`에는 시나리오 이름이나 별칭을 쓸 수 있습니다.
 
-```bash
-python main.py --show
-```
+| 시나리오 | 별칭 |
+|----------|------|
+| 메인 화면 진입 | `main`, `메인` |
+| 메인 팝업 노출 | `popup`, `팝업` |
+| 검색 기능 | `search`, `검색` |
+| 카테고리 상품 노출 | `category`, `카테고리` |
+| GNB 메뉴 진입 | `gnb`, `메뉴` |
+| 하단 인기상품 목록 | `popular`, `인기상품` |
+| 장바구니 담기 | `cart`, `장바구니` |
+| 배송지 등록 양식 | `shipping`, `배송지` |
+| 기획전 오류 확인 | `exhibition`, `기획전` |
 
-실행하면 PC → Mobile 순으로 테스트가 진행되며, 터미널에 각 항목의 진행 상황이 출력됩니다.
+환경변수 `MAX_WORKERS=1`을 주면 몰을 순차 실행합니다. 실패 항목이 하나라도 있으면 종료 코드 `1`로 끝납니다.
 
-```
-[PC] 테스트 시작...
-  [1/8] 메인 화면 진입... ✅
-  [2/8] 메인 팝업 노출... ✅
-  [3/8] 검색 기능... ✅
-  ...
-PC 완료: 8/8 통과
+---
 
-[Mobile] 테스트 시작...
-  ...
-```
+## GitHub Actions
 
-테스트 실패 항목이 하나라도 있으면 종료 코드 `1`로 종료합니다 (CI 연동 가능).
+워크플로 `UI_Test scheduler`(`.github/workflows/schedule.yml`)가 6시간 간격(`7 */6 * * *`, UTC)으로 자동 실행됩니다. KST로는 03:07 · 09:07 · 15:07 · 21:07이며, GitHub 스케줄 특성상 실제 시작 시각은 늦어지거나 일부 건너뛸 수 있습니다. 수동 실행은 **Actions → UI_Test scheduler → Run workflow**입니다.
 
-### GitHub Actions 자동 실행
+Repository Secrets에 아래 3개를 등록해야 합니다.
 
-매일 **08:38**, **14:38** (KST) 두 차례 자동 실행됩니다.
-수동 실행은 GitHub 저장소의 **Actions → 9-17 scheduler → Run workflow**에서 트리거할 수 있습니다.
+| Secret 이름 | 로컬 `.env` 키 | 설명 |
+|-------------|----------------|------|
+| `ID` | `ID` | 테스트 계정 아이디 |
+| `PASSWORD` | `PASSWORD` | 테스트 계정 비밀번호 |
+| `WEBHOOK_URL` | `DOORAY_WEBHOOK_URL` | 두레이 웹훅 URL (이름이 다릅니다) |
 
-Repository Secrets에 아래 세 항목이 등록되어 있어야 합니다.
-
-| Secret 이름 | 설명 |
-|-------------|------|
-| `username` | 테스트 계정 아이디 |
-| `password` | 테스트 계정 비밀번호 |
-| `WEBHOOK_URL` | 두레이 웹훅 URL |
+- Secrets와 `.env`에는 같은 값을 넣습니다. 값이 바뀌면 양쪽을 모두 고칩니다.
+- 워크플로는 `ID`, `PASSWORD`, `DOORAY_WEBHOOK_URL`, `MAX_WORKERS=1`만 전달합니다.
+- 실행이 끝나면 `test-reports`(reports/), `test-screenshots`(screenshots/)가 아티팩트로 30일간 보관됩니다.
+- 실패 항목이 있으면 종료 코드 1로 끝나서 Actions 실행도 failure로 표시됩니다.
 
 ---
 
@@ -160,11 +197,10 @@ Repository Secrets에 아래 세 항목이 등록되어 있어야 합니다.
 
 | 경로 | 내용 |
 |------|------|
-| `screenshots/` | 실패 시 자동 저장되는 스크린샷 (팝업 테스트는 성공 시도 저장). 파일명: `YYYYMMDD_HHMMSS_플랫폼_테스트명.png` |
-| `videos/` | 팝업 테스트 영상 (WebM 형식) |
-| `reports/` | 마크다운 형식 리포트. 파일명: `report_YYYYMMDD_HHMMSS.md` |
+| `reports/` | 마크다운 리포트 `report_YYYYMMDD_HHMMSS.md` (몰별 요약, 항목별 결과, 실패 상세) |
+| `screenshots/` | 실패 시 자동 저장되는 화면 (팝업 테스트는 성공 시에도 저장). `YYYYMMDD_HHMMSS_몰 플랫폼_테스트명.png` |
 
-> 7일 이상 지난 파일은 다음 실행 시 자동 삭제됩니다.
+두 폴더 모두 git에서 제외되며, 7일이 지난 파일은 다음 실행 때 삭제됩니다.
 
 ---
 
@@ -172,24 +208,26 @@ Repository Secrets에 아래 세 항목이 등록되어 있어야 합니다.
 
 ```
 UI_test/
-├── main.py              # 진입점: 설정 로드, PC/Mobile 순차 실행, 리포트 저장
-├── config.yaml          # URL, 검색 키워드, 카테고리, 두레이 봇 이름 설정
-├── .env                 # 계정 정보·웹훅 URL (git 제외, 로컬 전용)
-├── requirements.txt     # Python 의존성
+├── main.py                  # 진입점: 설정 로드, 몰/플랫폼별 실행, 리포트 저장, 두레이 발송
+├── config.yaml              # 몰 목록, 검색어, 카테고리, 두레이 봇 이름
+├── requirements.txt         # Python 의존성
+├── .env                     # 계정·웹훅 (git 제외, 로컬 전용)
+├── .github/workflows/
+│   └── schedule.yml         # GitHub Actions: UI_Test scheduler
 ├── tests/
-│   ├── base.py          # 공통 유틸: 브라우저 초기화, 팝업 닫기, 로그인, 스크린샷
-│   ├── test_main.py     # 메인 화면 진입
-│   ├── test_popup.py    # 메인 팝업 노출 및 링크 검증
-│   ├── test_search.py   # 검색 기능
-│   ├── test_category.py # 카테고리 메뉴 진입 및 상품 노출
-│   ├── test_gnb.py      # GNB 전체 메뉴 진입
-│   ├── test_popular.py  # 하단 인기상품 목록
-│   ├── test_cart.py     # 장바구니 담기 및 주문하기
-│   └── test_shipping.py # 배송지 등록 양식
+│   ├── base.py              # 브라우저 초기화, 로그인, 팝업 닫기, 스크린샷, run_test
+│   ├── test_main.py         # 메인 화면 진입
+│   ├── test_popup.py        # 메인 팝업
+│   ├── test_search.py       # 검색
+│   ├── test_category.py     # 카테고리
+│   ├── test_gnb.py          # GNB 메뉴
+│   ├── test_popular.py      # 하단 인기상품
+│   ├── test_cart.py         # 장바구니
+│   ├── test_shipping.py     # 배송지 등록 양식
+│   └── test_exhibition.py   # 기획전 오류 확인
 ├── report/
-│   ├── generator.py     # 마크다운 리포트 생성
-│   └── dooray.py        # 두레이 웹훅 발송
-├── screenshots/         # 스크린샷 저장 디렉터리
-├── videos/              # 영상 저장 디렉터리
-└── reports/             # 마크다운 리포트 저장 디렉터리
+│   ├── generator.py         # 마크다운 리포트 / 두레이 요약 메시지
+│   └── dooray.py            # 두레이 웹훅 발송
+├── screenshots/ reports/    # 결과물 (git 제외)
+└── archive/admin_stat/      # 중단된 Admin 통계 프로젝트 (보관용, 실행 대상 아님)
 ```

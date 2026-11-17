@@ -85,7 +85,8 @@ _DESKTOP_UA = (
 )
 
 
-def init_browser(playwright: Playwright, mobile: bool = False, record_video: bool = False, headless: bool = True):
+def init_browser(playwright: Playwright, mobile: bool = False, headless: bool = True):
+    # 영상 녹화(record_video) 기능은 사용하지 않아 주석 처리
     launch_kwargs = {
         "headless": headless,
         "args": [
@@ -99,12 +100,12 @@ def init_browser(playwright: Playwright, mobile: bool = False, record_video: boo
         launch_kwargs["executable_path"] = chromium_exe
     browser = playwright.chromium.launch(**launch_kwargs)
 
-    # 비디오 녹화 설정
+    # 비디오 녹화 설정 (사용하지 않아 주석 처리)
     context_args = {}
-    if record_video:
-        videos_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "videos")
-        os.makedirs(videos_dir, exist_ok=True)
-        context_args["record_video_dir"] = videos_dir
+    # if record_video:
+    #     videos_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "videos")
+    #     os.makedirs(videos_dir, exist_ok=True)
+    #     context_args["record_video_dir"] = videos_dir
 
     if mobile:
         device = playwright.devices["iPhone 14 Pro Max"]
@@ -229,104 +230,105 @@ def login(page: Page, base_url: str, username: str, password: str, login_url: st
         return False
 
 
-def welfare_sso_login(context, page: Page, welfare_url: str, welfare_id: str, welfare_password: str) -> "Page | None":
-    """welfare 사이트 로그인 → 배너 클릭 → 새 탭(castdream, 자동 로그인) 반환"""
-    try:
-        page.goto(welfare_url, wait_until="domcontentloaded", timeout=20000)
-        close_popups(page)
+# welfare SSO 로그인 (castdream 점검 중단으로 주석 처리)
+# def welfare_sso_login(context, page: Page, welfare_url: str, welfare_id: str, welfare_password: str) -> "Page | None":
+#     """welfare 사이트 로그인 → 배너 클릭 → 새 탭(castdream, 자동 로그인) 반환"""
+#     try:
+#         page.goto(welfare_url, wait_until="domcontentloaded", timeout=20000)
+#         close_popups(page)
 
-        # welfare 사이트 로그인
-        if page.locator("input[type='password']").count() > 0:
-            for id_sel in [
-                "input[name='username']", "input[name='id']", "input[name='userId']",
-                "input[type='text']", "input[type='email']",
-            ]:
-                try:
-                    el = page.locator(id_sel).first
-                    if el.is_visible(timeout=2000):
-                        el.fill(welfare_id)
-                        break
-                except Exception:
-                    continue
-            page.locator("input[type='password']").first.fill(welfare_password)
-            for btn_sel in ["button[type='submit']", "input[type='submit']", "button"]:
-                try:
-                    btn = page.locator(btn_sel).first
-                    if btn.is_visible(timeout=1000):
-                        btn.click(timeout=3000)
-                        break
-                except Exception:
-                    continue
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=12000)
-            except Exception:
-                pass
-            close_popups(page)
+#         # welfare 사이트 로그인
+#         if page.locator("input[type='password']").count() > 0:
+#             for id_sel in [
+#                 "input[name='username']", "input[name='id']", "input[name='userId']",
+#                 "input[type='text']", "input[type='email']",
+#             ]:
+#                 try:
+#                     el = page.locator(id_sel).first
+#                     if el.is_visible(timeout=2000):
+#                         el.fill(welfare_id)
+#                         break
+#                 except Exception:
+#                     continue
+#             page.locator("input[type='password']").first.fill(welfare_password)
+#             for btn_sel in ["button[type='submit']", "input[type='submit']", "button"]:
+#                 try:
+#                     btn = page.locator(btn_sel).first
+#                     if btn.is_visible(timeout=1000):
+#                         btn.click(timeout=3000)
+#                         break
+#                 except Exception:
+#                     continue
+#             try:
+#                 page.wait_for_load_state("domcontentloaded", timeout=12000)
+#             except Exception:
+#                 pass
+#             close_popups(page)
 
-        # 배너 클릭 → 페이지 소스에서 castdream SSO URL 추출 또는 새 탭 감지
-        import time as _time
-        import re as _re
+#         # 배너 클릭 → 페이지 소스에서 castdream SSO URL 추출 또는 새 탭 감지
+#         import time as _time
+#         import re as _re
 
-        # 새 페이지 이벤트를 즉시 캡처 (popup이 빠르게 열리고 닫혀도 놓치지 않음)
-        all_new_pages = []
-        context.on("page", lambda p: all_new_pages.append(p))
+#         # 새 페이지 이벤트를 즉시 캡처 (popup이 빠르게 열리고 닫혀도 놓치지 않음)
+#         all_new_pages = []
+#         context.on("page", lambda p: all_new_pages.append(p))
 
-        page.click("a[onclick*='checkPopupAndRedirect']", timeout=8000)
+#         page.click("a[onclick*='checkPopupAndRedirect']", timeout=8000)
 
-        # 페이지 이동 또는 로드 대기
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=8000)
-        except Exception:
-            pass
+#         # 페이지 이동 또는 로드 대기
+#         try:
+#             page.wait_for_load_state("domcontentloaded", timeout=8000)
+#         except Exception:
+#             pass
 
-        # 페이지 소스에서 castdream SSO URL 직접 추출
-        try:
-            src = page.content()
-            m = _re.search(r'https?://[a-z]*castdream[^\s\'"<>]+', src)
-            if m:
-                castdream_direct_url = m.group(0)
-                page.goto(castdream_direct_url, wait_until="domcontentloaded", timeout=20000)
-                close_popups(page)
-                print(f"  [welfare SSO] castdream 접속 완료: {page.url}")
-                return page
-        except Exception:
-            pass
+#         # 페이지 소스에서 castdream SSO URL 직접 추출
+#         try:
+#             src = page.content()
+#             m = _re.search(r'https?://[a-z]*castdream[^\s\'"<>]+', src)
+#             if m:
+#                 castdream_direct_url = m.group(0)
+#                 page.goto(castdream_direct_url, wait_until="domcontentloaded", timeout=20000)
+#                 close_popups(page)
+#                 print(f"  [welfare SSO] castdream 접속 완료: {page.url}")
+#                 return page
+#         except Exception:
+#             pass
 
-        # 새 탭/팝업 폴링 (최대 20초)
-        castdream_page = None
-        for _ in range(40):
-            _time.sleep(0.5)
-            for p in list(all_new_pages) + list(context.pages):
-                try:
-                    if "castdream" in p.url and not p.is_closed():
-                        castdream_page = p
-                        break
-                except Exception:
-                    continue
-            if castdream_page:
-                break
-            try:
-                if "castdream" in page.url:
-                    castdream_page = page
-                    break
-            except Exception:
-                pass
+#         # 새 탭/팝업 폴링 (최대 20초)
+#         castdream_page = None
+#         for _ in range(40):
+#             _time.sleep(0.5)
+#             for p in list(all_new_pages) + list(context.pages):
+#                 try:
+#                     if "castdream" in p.url and not p.is_closed():
+#                         castdream_page = p
+#                         break
+#                 except Exception:
+#                     continue
+#             if castdream_page:
+#                 break
+#             try:
+#                 if "castdream" in page.url:
+#                     castdream_page = page
+#                     break
+#             except Exception:
+#                 pass
 
-        if castdream_page is None:
-            print("  [welfare SSO] castdream 페이지를 찾을 수 없음")
-            return None
+#         if castdream_page is None:
+#             print("  [welfare SSO] castdream 페이지를 찾을 수 없음")
+#             return None
 
-        try:
-            castdream_page.wait_for_load_state("domcontentloaded", timeout=15000)
-        except Exception:
-            pass
-        close_popups(castdream_page)
-        print(f"  [welfare SSO] castdream 접속 완료: {castdream_page.url}")
-        return castdream_page
+#         try:
+#             castdream_page.wait_for_load_state("domcontentloaded", timeout=15000)
+#         except Exception:
+#             pass
+#         close_popups(castdream_page)
+#         print(f"  [welfare SSO] castdream 접속 완료: {castdream_page.url}")
+#         return castdream_page
 
-    except Exception as e:
-        print(f"  [welfare SSO] 실패: {str(e)[:80]}")
-        return None
+#     except Exception as e:
+#         print(f"  [welfare SSO] 실패: {str(e)[:80]}")
+#         return None
 
 
 def save_screenshot(page: Page, platform: str, test_name: str) -> str:
