@@ -3,6 +3,8 @@
 Playwright 기반의 온누리 계열 몰 UI 자동화 점검 도구입니다.
 몰마다 PC와 모바일 화면을 실제 Chromium 브라우저로 열어 9개 시나리오를 검증하고, 결과를 마크다운 리포트·스크린샷으로 저장하며 두레이 메신저로 요약을 발송합니다.
 
+같은 레포의 `admin_stat/`에는 드림몰 Admin 통계를 수집해 전송하는 별도 프로그램이 있습니다. 두 프로그램은 서로 다른 워크플로로 실행됩니다([GitHub Actions](#github-actions) 참고).
+
 ---
 
 ## 목차
@@ -176,7 +178,16 @@ python main.py --mall thek --only gnb --show
 
 ## GitHub Actions
 
-워크플로 `UI_Test scheduler`(`.github/workflows/schedule.yml`)가 6시간 간격(`7 */6 * * *`, UTC)으로 자동 실행됩니다. KST로는 03:07 · 09:07 · 15:07 · 21:07이며, GitHub 스케줄 특성상 실제 시작 시각은 늦어지거나 일부 건너뛸 수 있습니다. 수동 실행은 **Actions → UI_Test scheduler → Run workflow**입니다.
+이 레포에는 워크플로가 두 개 있습니다.
+
+| 워크플로 | 파일 | 실행 주기 | 대상 폴더 |
+|----------|------|-----------|-----------|
+| UI_Test scheduler | `.github/workflows/schedule.yml` | 6시간 간격 | 루트 (`main.py`) |
+| 드림몰 Admin 통계 | `.github/workflows/admin_stat.yml` | 수동 실행만 (자동 실행은 주석 처리) | `admin_stat/` |
+
+### UI_Test scheduler
+
+워크플로 `UI_Test scheduler`가 6시간 간격(`7 */6 * * *`, UTC)으로 자동 실행됩니다. KST로는 03:07 · 09:07 · 15:07 · 21:07이며, GitHub 스케줄 특성상 실제 시작 시각은 늦어지거나 일부 건너뛸 수 있습니다. 수동 실행은 **Actions → UI_Test scheduler → Run workflow**입니다.
 
 Repository Secrets에 아래 3개를 등록해야 합니다.
 
@@ -190,6 +201,24 @@ Repository Secrets에 아래 3개를 등록해야 합니다.
 - 워크플로는 `ID`, `PASSWORD`, `DOORAY_WEBHOOK_URL`, `MAX_WORKERS=1`만 전달합니다.
 - 실행이 끝나면 `test-reports`(reports/), `test-screenshots`(screenshots/)가 아티팩트로 30일간 보관됩니다.
 - 실패 항목이 있으면 종료 코드 1로 끝나서 Actions 실행도 failure로 표시됩니다.
+
+### 드림몰 Admin 통계
+
+`admin_stat/`의 Selenium 프로그램이 드림몰 Admin 통계를 수집해 이메일(과 설정 시 카카오)로 전송합니다. 워크플로 `드림몰 Admin 통계`는 `admin_stat/` 안에서 `python main.py`를 실행합니다. 현재는 사용하지 않아 자동 실행(`schedule`)을 주석 처리했고 **Actions → 드림몰 Admin 통계 → Run workflow**로 수동 실행만 가능합니다. 다시 쓰려면 `admin_stat.yml`의 `schedule` 주석을 풉니다(기존 주기: 매일 23:02 UTC = 08:02 KST, 월요일이면 주간·매달 1일이면 월간 매출 통계 전송은 코드가 판단). 결과물은 `admin-stat-reports` 아티팩트(`admin_stat/reports/`)로 30일간 보관됩니다.
+
+Secrets 이름은 로컬 `.env` 키와 **같습니다**. 같은 값을 양쪽에 넣습니다.
+
+| Secret / `.env` 키 | 용도 |
+|--------------------|------|
+| `ADMIN_USER`, `ADMIN_PASS` | Admin 로그인 계정 |
+| `EMAIL_FROM`, `EMAIL_PASSWORD`, `EMAIL_TO` | 보내는 메일 / 앱 비밀번호 / 받는 메일 |
+| `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT` | SMTP 서버 / 포트 |
+| `B2B_ADMIN_USER`, `B2B_ADMIN_PASS` | B2B Admin 로그인 계정 |
+| `SALES_EMAIL_TO` | 매출 통계 수신자 (없으면 `EMAIL_TO` 사용) |
+| `LOGIN_USER_FIELD`, `LOGIN_PASS_FIELD` | 로그인 입력칸 이름. 비워 두면 후보 이름을 자동 탐지 |
+| `SOLAPI_API_KEY`, `SOLAPI_API_SECRET`, `SOLAPI_FROM_NUMBER`, `KAKAO_CHANNEL_ID`, `KAKAO_TO` | 카카오 발송용 |
+
+마지막 두 줄은 이전에 Secrets에 등록하지 않고 운영하던 항목입니다. `UI_Test scheduler`의 Secrets(`ID`, `PASSWORD`, `WEBHOOK_URL`)와 이름이 겹치지 않습니다.
 
 ---
 
@@ -213,7 +242,8 @@ UI_test/
 ├── requirements.txt         # Python 의존성
 ├── .env                     # 계정·웹훅 (git 제외, 로컬 전용)
 ├── .github/workflows/
-│   └── schedule.yml         # GitHub Actions: UI_Test scheduler
+│   ├── schedule.yml         # GitHub Actions: UI_Test scheduler
+│   └── admin_stat.yml       # GitHub Actions: 드림몰 Admin 통계
 ├── tests/
 │   ├── base.py              # 브라우저 초기화, 로그인, 팝업 닫기, 스크린샷, run_test
 │   ├── test_main.py         # 메인 화면 진입
@@ -229,5 +259,5 @@ UI_test/
 │   ├── generator.py         # 마크다운 리포트 / 두레이 요약 메시지
 │   └── dooray.py            # 두레이 웹훅 발송
 ├── screenshots/ reports/    # 결과물 (git 제외)
-└── archive/admin_stat/      # 중단된 Admin 통계 프로젝트 (보관용, 실행 대상 아님)
+└── admin_stat/              # 드림몰 Admin 통계 전송 프로젝트 (admin_stat.yml 로 실행)
 ```

@@ -1,14 +1,21 @@
 name: 드림몰 Admin 통계
 
 on:
-  schedule:
-    # 매일 23:02 UTC (한국 시간으로 08:02)에 실행
-    - cron: '2 23 * * *'
+  # 현재 사용하지 않아 자동 실행(schedule)은 주석 처리. 다시 쓰려면 아래 3줄의 주석을 푼다.
+  # (기존 Admin_stat 주기 그대로: 매일 23:02 UTC = 08:02 KST,
+  #  월요일이면 주간 · 매달 1일이면 월간 매출 통계는 main.py 가 판단해서 전송)
+  # schedule:
+  #   - cron: '2 23 * * *'
   workflow_dispatch:
 
 jobs:
   run_stats:
     runs-on: ubuntu-latest
+
+    # admin_stat 폴더 안에서 실행 (루트의 report/ 패키지와 섞이지 않도록)
+    defaults:
+      run:
+        working-directory: admin_stat
 
     steps:
       - name: Checkout code
@@ -54,6 +61,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reports
-          path: reports/
+          name: admin-stat-reports
+          path: admin_stat/reports/
           retention-days: 30
