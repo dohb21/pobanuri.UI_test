@@ -204,7 +204,14 @@ Repository Secrets에 아래 3개를 등록해야 합니다.
 
 ### 드림몰 Admin 통계
 
-`admin_stat/`의 Selenium 프로그램이 드림몰 Admin 통계를 수집해 이메일(과 설정 시 카카오)로 전송합니다. 워크플로 `드림몰 Admin 통계`는 `admin_stat/` 안에서 `python main.py`를 실행합니다. 현재는 사용하지 않아 자동 실행(`schedule`)을 주석 처리했고 **Actions → 드림몰 Admin 통계 → Run workflow**로 수동 실행만 가능합니다. 다시 쓰려면 `admin_stat.yml`의 `schedule` 주석을 풉니다(기존 주기: 매일 23:02 UTC = 08:02 KST, 월요일이면 주간·매달 1일이면 월간 매출 통계 전송은 코드가 판단). 결과물은 `admin-stat-reports` 아티팩트(`admin_stat/reports/`)로 30일간 보관됩니다.
+`admin_stat/`의 Selenium 프로그램이 드림몰 Admin 통계를 수집해 이메일(과 설정 시 카카오)로 전송합니다. 워크플로 `드림몰 Admin 통계`는 `admin_stat/` 안에서 `python main.py`를 실행합니다. 현재는 사용하지 않아 자동 실행(`schedule`)을 주석 처리했고 **Actions → 드림몰 Admin 통계 → Run workflow**로 수동 실행만 가능합니다. 다시 쓰려면 `admin_stat.yml`의 `schedule` 주석을 풉니다. 주석을 풀면 아래처럼 매출 통계만 전송합니다(매일 보내던 일간 통계는 보내지 않음).
+
+| 실행 시각 | 실행 명령 | 내용 |
+|-----------|-----------|------|
+| 매주 월요일 09:02 KST (`2 0 * * 1`) | `python main.py --sales-weekly` | 직전 주 월~일 매출 통계 |
+| 매월 1일 09:02 KST (`2 0 1 * *`) | `python main.py --sales-monthly` | 직전 달 매출 통계 |
+
+1일이 월요일이면 두 번 실행되어 주간·월간을 각각 보냅니다. 수동 실행할 때는 `weekly` / `monthly` 중 하나를 고릅니다. 결과물은 `admin-stat-reports` 아티팩트(`admin_stat/reports/`)로 30일간 보관됩니다.
 
 Secrets 이름은 로컬 `.env` 키와 **같습니다**. 같은 값을 양쪽에 넣습니다.
 

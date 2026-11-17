@@ -1,0 +1,450 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI 자동화 테스트 인수인계 가이드</title>
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --text:#1c2230; --muted:#5a6376; --line:#e2e5eb;
+  --accent:#2f5bea; --accent-soft:#e9eeff;
+  --warn-bg:#fff5e6; --warn-line:#eab05a; --warn-text:#6b4300;
+  --bad-bg:#fdecec; --bad-line:#e58a8a; --bad-text:#7a1f1f;
+  --ok-bg:#e8f6ee; --ok-line:#7cc79b; --ok-text:#14532d;
+  --code-bg:#eef0f5; --pre-bg:#161b26; --pre-text:#e6e9f2;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#10131a; --surface:#181c26; --text:#e8ebf2; --muted:#9aa3b6; --line:#2a3040;
+    --accent:#7c9bff; --accent-soft:#1f2740;
+    --warn-bg:#2b2112; --warn-line:#8a6a2b; --warn-text:#f1d49a;
+    --bad-bg:#2d1717; --bad-line:#8a3d3d; --bad-text:#f3b4b4;
+    --ok-bg:#12261b; --ok-line:#2f7a4f; --ok-text:#a8e2c0;
+    --code-bg:#232938; --pre-bg:#0b0e14; --pre-text:#e6e9f2;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:64px}
+body{margin:0; background:var(--bg); color:var(--text);
+  font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  line-height:1.7; font-size:15.5px}
+a{color:var(--accent)}
+header.hero{background:var(--surface); border-bottom:1px solid var(--line); padding:32px 16px 24px}
+.wrap{max-width:980px; margin:0 auto; padding:0 16px}
+header.hero .wrap{padding:0}
+h1{margin:0 0 6px; font-size:26px; letter-spacing:-.01em}
+.sub{color:var(--muted); margin:0}
+.meta{margin-top:14px; display:flex; flex-wrap:wrap; gap:8px}
+.chip{font-size:13px; padding:3px 10px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:600}
+nav.toc{position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--line)}
+nav.toc .wrap{display:flex; gap:4px; overflow-x:auto; padding:8px 16px; white-space:nowrap}
+nav.toc a{text-decoration:none; color:var(--muted); font-size:14px; padding:4px 10px; border-radius:8px}
+nav.toc a:hover{background:var(--accent-soft); color:var(--accent)}
+main{padding:8px 0 64px}
+section{margin-top:36px}
+h2{font-size:21px; margin:0 0 12px; padding-bottom:8px; border-bottom:2px solid var(--line)}
+h2 .n{color:var(--accent); margin-right:6px}
+h3{font-size:17px; margin:26px 0 8px}
+p{margin:8px 0}
+ul,ol{margin:8px 0; padding-left:22px}
+li{margin:3px 0}
+code{background:var(--code-bg); padding:1px 6px; border-radius:5px; font-family:Consolas,"D2Coding",monospace; font-size:.9em; overflow-wrap:anywhere}
+pre{position:relative; background:var(--pre-bg); color:var(--pre-text); padding:14px 16px; border-radius:10px;
+  overflow-x:auto; font-family:Consolas,"D2Coding",monospace; font-size:13.5px; line-height:1.6; margin:10px 0}
+pre code{background:none; padding:0; color:inherit; font-size:inherit; overflow-wrap:normal}
+pre .copy{position:absolute; top:8px; right:8px; font-size:12px; border:1px solid #3a4258; background:#232a3b; color:#cfd6ea;
+  border-radius:6px; padding:2px 9px; cursor:pointer}
+pre .copy:hover{background:#2d3650}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px}
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; margin:12px 0}
+.grid .card h3{margin:0 0 6px; font-size:15px; color:var(--accent)}
+.grid .card p{margin:0; font-size:14.5px}
+.callout{border-radius:10px; padding:12px 16px; margin:14px 0; border:1px solid; font-size:14.5px}
+.callout strong:first-child{display:inline-block; margin-right:4px}
+.callout.warn{background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn-text)}
+.callout.bad{background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad-text)}
+.callout.ok{background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok-text)}
+.callout.info{background:var(--accent-soft); border-color:var(--accent); color:var(--text)}
+.tbl{overflow-x:auto; margin:10px 0; border:1px solid var(--line); border-radius:10px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; min-width:560px; font-size:14.5px}
+th,td{padding:9px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line)}
+th{background:var(--code-bg); font-weight:700; white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.tag{display:inline-block; font-size:12px; font-weight:700; padding:1px 8px; border-radius:6px; margin-right:4px}
+.tag.must{background:var(--bad-bg); color:var(--bad-text)}
+.tag.opt{background:var(--accent-soft); color:var(--accent)}
+.tag.ok{background:var(--ok-bg); color:var(--ok-text)}
+.check{display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border:1px solid var(--line); border-radius:10px;
+  background:var(--surface); margin:8px 0}
+.check input{margin-top:6px; width:18px; height:18px; flex:none}
+.check .body{flex:1; min-width:0}
+.check .t{font-weight:700}
+.check .d{font-size:14.5px; color:var(--text)}
+.check .d p{margin:4px 0}
+.small{font-size:13.5px; color:var(--muted)}
+footer{border-top:1px solid var(--line); padding:20px 0 40px; color:var(--muted); font-size:13.5px}
+@media (max-width:600px){ h1{font-size:22px} body{font-size:15px} }
+@media print{
+  nav.toc{display:none} body{background:#fff; color:#000}
+  pre{white-space:pre-wrap; background:#f3f3f3; color:#000} pre .copy{display:none}
+  .card,.check,.tbl{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>UI 자동화 테스트 인수인계 가이드</h1>
+    <p class="sub">온누리 계열 몰 UI 자동 점검 (Playwright + GitHub Actions + 두레이 알림)</p>
+    <div class="meta">
+      <span class="chip">기준일 2026-11-11</span>
+      <span class="chip">레포 새 위치로 이전 예정</span>
+      <span class="chip">점검 대상 2개 몰</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#summary">한눈에 보기</a>
+  <a href="#checklist">① 바꿀 정보</a>
+  <a href="#how">② 동작 원리</a>
+  <a href="#usage">③ 사용 방법</a>
+  <a href="#modify">④ 수정 방법</a>
+  <a href="#faq">⑤ 문제 해결</a>
+  <a href="#structure">⑥ 구조</a>
+  <a href="#appendix">부록</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ───────────── 한눈에 보기 ───────────── -->
+<section id="summary">
+  <h2>한눈에 보기</h2>
+  <div class="grid">
+    <div class="card"><h3>무엇을 하나</h3>
+      <p>드림몰·교직원공제회(thek)의 PC/모바일 화면을 실제 브라우저(Chromium)로 열어 <b>9개 시나리오</b>를 점검하고, 결과를 두레이 메신저로 알립니다.</p></div>
+    <div class="card"><h3>어디서 도나</h3>
+      <p><b>GitHub Actions</b> <code>UI_Test scheduler</code>가 6시간 간격 cron으로 실행합니다. 수동 실행도 가능합니다. 이 PC의 Windows 작업 스케줄러에는 등록된 작업이 없습니다(로컬 실행은 수동).</p></div>
+    <div class="card"><h3>인수 시 꼭 바꿀 것</h3>
+      <p>새 레포에는 코드만 올라가고 <b><code>.env</code>와 Secrets는 따라가지 않습니다.</b> 같은 값을 <b>GitHub Secrets(자동 실행용)</b>와 <b>로컬 <code>.env</code>(로컬 테스트용)</b> 두 곳에 저장해야 합니다. 상세는 <a href="#c2">Secrets ↔ .env</a>를 보세요.</p></div>
+  </div>
+</section>
+
+<!-- ───────────── ① 바꿀 정보 ───────────── -->
+<section id="checklist">
+  <h2><span class="n">①</span>인수 시 바꿔야 하는 정보 (체크리스트)</h2>
+  <p class="small">체크박스는 화면 확인용입니다(저장되지 않음). <span class="tag must">필수</span>는 안 바꾸면 동작/알림이 끊기거나 이전 담당자 정보가 남는 항목입니다.</p>
+
+  <div class="check"><input type="checkbox" id="c2"><div class="body">
+    <div class="t"><span class="tag must">필수</span><label for="c2">Secrets ↔ 로컬 <code>.env</code> — 같은 값을 두 곳에 저장</label></div>
+    <div class="d">
+      <p>Secrets와 <code>.env</code>에는 <b>같은 값</b>이 들어가야 합니다. 저장하는 곳만 두 곳입니다. 둘은 서로 연결돼 있지 않아서, 값이 바뀌면(계정 비밀번호 변경 등) <b>양쪽 모두 고쳐야 합니다.</b></p>
+      <div class="tbl"><table>
+        <tr><th></th><th>GitHub Secrets</th><th>로컬 <code>.env</code> 파일</th></tr>
+        <tr><th>쓰이는 곳</th><td>GitHub Actions의 자동 실행 (6시간 간격)</td><td>내 PC에서 <code>python main.py</code>로 하는 로컬 테스트</td></tr>
+        <tr><th>저장 위치</th><td>레포 <i>Settings → Secrets and variables → Actions</i></td><td>프로젝트 폴더 바로 아래의 <code>.env</code></td></tr>
+        <tr><th>GitHub에 올라가나</th><td>GitHub 안에 암호화되어 저장됨. 등록한 뒤에는 값을 다시 볼 수 없음</td><td><b>올라가지 않음.</b> 담당자마다 직접 만들어야 함</td></tr>
+      </table></div>
+
+      <p><b>양쪽에 같은 값으로 맞춰야 하는 것</b> (이름이 같은 줄은 이름까지 똑같이, 다른 줄은 아래 주의 참고)</p>
+      <div class="tbl"><table>
+        <tr><th>항목</th><th>GitHub Secrets 이름</th><th>로컬 <code>.env</code> 키</th><th>값</th></tr>
+        <tr><td>테스트 계정 아이디</td><td><code>ID</code></td><td><code>ID</code></td><td>전용 테스트 계정 아이디 (<a href="#c3">전용 계정으로</a>)</td></tr>
+        <tr><td>테스트 계정 비밀번호</td><td><code>PASSWORD</code></td><td><code>PASSWORD</code></td><td>위 계정의 비밀번호</td></tr>
+        <tr><td>두레이 웹훅</td><td><code>WEBHOOK_URL</code></td><td><code>DOORAY_WEBHOOK_URL</code> <b>(이름 다름)</b></td><td>알림 받을 두레이 채널의 Incoming Webhook URL</td></tr>
+        
+      </table></div>
+
+      
+
+      <p><b>새 담당자의 <code>.env</code> 만들기</b> (프로젝트 폴더 바로 아래, 파일 이름은 점으로 시작하는 <code>.env</code>)</p>
+<pre><code># 필수 — GitHub Secrets 의 ID / PASSWORD 와 같은 값
+ID=테스트계정아이디
+PASSWORD=테스트계정비밀번호
+
+DOORAY_WEBHOOK_URL=</code></pre>
+      <p class="small"><code>.env</code> 값은 이미 설정된 시스템 환경변수보다 우선합니다(<code>load_dotenv(override=True)</code>). <code>.env</code>는 git에 없으니 담당자마다 직접 만들어야 합니다.</p>
+
+          </div></div></div>
+
+  <div class="check"><input type="checkbox" id="c3"><div class="body">
+    <div class="t"><span class="tag must">필수</span><label for="c3">테스트 계정</label></div>
+    <div class="d">
+      <p>같은 <code>ID</code>/<code>PASSWORD</code> 한 쌍으로 <b>로그인이 필요한 모든 몰</b>(드림몰, thek)에 로그인합니다. 따라서 두 몰 모두에 가입돼 있고 로그인 가능한 <b>test 계정</b> 사용을 권장합니다.</p>
+      
+      <p>계정을 교체하면: ① GitHub Secrets <code>ID</code>/<code>PASSWORD</code> 갱신 ② 로컬 <code>.env</code> 갱신 ③ 각 몰에서 로그인과 장바구니 담기가 되는지 <code>python main.py --show</code>로 확인.</p>
+    </div></div></div>
+
+  <div class="check"><input type="checkbox" id="c4"><div class="body">
+    <div class="t"><span class="tag must">필수</span><label for="c4">두레이 웹훅(알림 채널)</label></div>
+    <div class="d">
+      <ul>
+        <li>알림을 받을 두레이 채널에서 Incoming Webhook URL을 새로 발급해 Secret <code>WEBHOOK_URL</code>에 등록합니다.</li>
+        <li>봇 표시 이름은 <code>config.yaml</code>의 <code>dooray.bot_name</code>(현재 “드림몰 테스트봇”)입니다.</li>
+        <li><b>성공해도 매 실행마다</b> 발송됩니다(“ERROR 건수 : 0건”). 실패가 있으면 <code>[몰 PC/Mobile] 항목 - 오류</code> 목록이 함께 갑니다.</li>
+      </ul>
+    </div></div></div>
+
+  <div class="check"><input type="checkbox" id="c8"><div class="body">
+    <div class="t"><span class="tag opt">참고</span><label for="c8">히스토리에 남은 파일 (옮기기 전에 알아둘 점)</label></div>
+    <div class="d">
+      <ul>
+        <li>코드에는 아이디·전화번호·주소 같은 개인정보가 없습니다(배송지 폼에는 “테스트”만 입력). 계정 정보는 환경변수(<code>ID</code>/<code>PASSWORD</code>)로만 읽습니다. <b>코드는 고칠 필요 없이 Secrets와 <code>.env</code>만 새로 설정하면 됩니다.</b></li>
+        <li><code>.env</code> 파일은 한 번도 커밋된 적이 없고, 두레이 웹훅 URL이나 비밀번호가 코드·히스토리에 하드코딩돼 있지 않습니다(과거 예시 설정 파일에 <code>YOUR_PASSWORD</code> 자리표시자만 있었음).</li>
+        <li>다만 과거 커밋에 <b>스크린샷·영상 22개</b>가 올라가 있습니다. 로그인된 화면이 찍혔다면 계정명 등이 보일 수 있으니, 히스토리째 옮길지 현재 상태만 옮길지 정할 때 참고하세요.</li>
+      </ul>
+    </div></div></div>
+
+  <div class="check"><input type="checkbox" id="c9"><div class="body">
+    <div class="t"><span class="tag opt">확인</span><label for="c9">Actions 사용 시간 (비공개 레포로 옮길 때)</label></div>
+    <div class="d">
+      <p>최근 30회 실행 기준 1회 <b>평균 약 15분(최대 32분)</b>입니다. 지금처럼 하루 약 3회면 월 약 1,300분, 설정대로 6시간마다(하루 4회)면 월 약 1,800분입니다. 공개 레포는 무료이지만 <b>비공개 레포는 플랜별 월 무료 사용 시간에 걸립니다</b>(GitHub 무료 플랜은 월 2,000분 안팎). 옮길 곳의 플랜과 정책을 확인하세요.</p>
+    </div></div></div>
+</section>
+
+<!-- ───────────── ② 동작 원리 ───────────── -->
+<section id="how">
+  <h2><span class="n">②</span>동작 원리</h2>
+<pre><code>python main.py
+  └─ config.yaml 의 malls 를 읽음 (skip: true 인 몰 제외)
+       └─ 몰마다 별도 프로세스 (동시 실행 수: 로컬 기본 2 / Actions 1)
+            └─ PC → Mobile 순서로
+                 ├─ Chromium 실행 (PC 1280×800 / Mobile iPhone 14 Pro Max 에뮬레이션)
+                 ├─ 로그인이 필요한 몰이면 ID/PASSWORD 로 먼저 로그인
+                 ├─ 9개 시나리오 순차 실행 → 결과(TestResult) 수집
+                 └─ 실패 시 스크린샷 자동 저장
+  └─ reports/report_YYYYMMDD_HHMMSS.md 저장 + 두레이로 요약 발송
+  └─ 실패가 1건이라도 있으면 종료 코드 1</code></pre>
+
+  <div class="tbl"><table>
+    <tr><th>#</th><th>시나리오</th><th>검증 내용</th><th><code>--only</code> 별칭</th></tr>
+    <tr><td>1</td><td>메인 화면 진입</td><td>페이지 로드, 타이틀·body 표시</td><td><code>main</code>, <code>메인</code></td></tr>
+    <tr><td>2</td><td>메인 팝업 노출</td><td>배너 팝업 탐지, 슬라이드 링크 진입, 닫기 동작</td><td><code>popup</code>, <code>팝업</code></td></tr>
+    <tr><td>3</td><td>검색 기능</td><td>config의 유효 키워드 중 무작위 선택 → 검색 결과 상품 1개 이상</td><td><code>search</code>, <code>검색</code></td></tr>
+    <tr><td>4</td><td>카테고리 상품 노출</td><td>카테고리 풀에서 무작위 N개(기본 5) 진입 → 상품 목록 1개 이상</td><td><code>category</code>, <code>카테고리</code></td></tr>
+    <tr><td>5</td><td>GNB 메뉴 진입</td><td>상단 메뉴 전체 순회, 이동 또는 모달 열림 확인</td><td><code>gnb</code>, <code>메뉴</code></td></tr>
+    <tr><td>6</td><td>하단 인기상품 목록</td><td>메인 하단 인기상품 섹션·탭·상품 로드</td><td><code>popular</code>, <code>인기상품</code></td></tr>
+    <tr><td>7</td><td>장바구니 담기</td><td>장바구니 비우기 → 상품 담기 → 주문하기로 주문 페이지 진입 확인 → 다시 비우기 <span class="small">(계정 필요)</span></td><td><code>cart</code>, <code>장바구니</code></td></tr>
+    <tr><td>8</td><td>배송지 등록 양식</td><td>배송지 추가 팝업이 열리고 입력 필드가 동작하는지만 확인(저장 안 함) <span class="small">(계정 필요)</span></td><td><code>shipping</code>, <code>배송지</code></td></tr>
+    <tr><td>9</td><td>기획전 오류 확인</td><td>기획전 페이지가 오류 코드(PRD0001~0003) 화면으로 뜨지 않는지 확인</td><td><code>exhibition</code>, <code>기획전</code></td></tr>
+  </table></div>
+  <p class="small"><code>ID</code>가 비어 있으면 7·8번은 “계정 없음”으로 건너뜁니다.</p>
+</section>
+
+<!-- ───────────── ③ 사용 방법 ───────────── -->
+<section id="usage">
+  <h2><span class="n">③</span>사용 방법</h2>
+
+  <h3>3-1. 로컬 실행</h3>
+  <p>Python 3.11 이상이 필요합니다.</p>
+<pre><code>pip install -r requirements.txt
+playwright install chromium</code></pre>
+  <p>그다음 <a href="#c2">①의 Secrets ↔ .env 표</a>대로 파일을 만들고 실행합니다.</p>
+  <div class="tbl"><table>
+    <tr><th>명령</th><th>동작</th></tr>
+    <tr><td><code>python main.py</code></td><td>전체 몰·전체 시나리오 (브라우저 숨김)</td></tr>
+    <tr><td><code>python main.py --show</code></td><td>브라우저 창을 띄워서 실행 (디버깅용)</td></tr>
+    <tr><td><code>python main.py --mall dream</code></td><td>특정 몰만. 몰 <code>id</code>나 이름 일부, 대소문자 무관 (<code>dream</code>, <code>thek</code>)</td></tr>
+    <tr><td><code>python main.py --only 검색,cart</code></td><td>특정 시나리오만 (위 표의 별칭, 쉼표로 여러 개)</td></tr>
+    <tr><td><code>python main.py --mall thek --only gnb --show</code></td><td>조합 사용 — 문제 재현할 때 가장 유용</td></tr>
+  </table></div>
+  <p class="small">순차 실행이 필요하면 환경변수 <code>MAX_WORKERS=1</code>을 줍니다. <code>--mall=dream</code>, <code>--only=cart</code>처럼 <code>=</code> 형태도 됩니다.</p>
+
+  <h3>3-2. 결과물 위치</h3>
+  <div class="tbl"><table>
+    <tr><th>경로</th><th>내용</th></tr>
+    <tr><td><code>reports/report_*.md</code></td><td>마크다운 상세 리포트 (몰별 요약 + 항목별 결과 + 실패 상세)</td></tr>
+    <tr><td><code>screenshots/</code></td><td>실패 시 자동 저장된 화면 (팝업 테스트는 성공 시에도 저장)</td></tr>
+  </table></div>
+  <p class="small">두 폴더 모두 git에서 제외되고, 실행할 때 7일 지난 파일은 자동 삭제됩니다.</p>
+
+  <h3>3-3. GitHub Actions (자동 실행)</h3>
+  <ul>
+    <li>워크플로 이름: <b>UI_Test scheduler</b> (<code>.github/workflows/schedule.yml</code>)</li>
+    <li><b>수동 실행</b>: 레포 <i>Actions → UI_Test scheduler → Run workflow</i></li>
+    <li>cron은 <code>7 */6 * * *</code> (UTC). 즉 KST 기준 <b>03:07 · 09:07 · 15:07 · 21:07</b>입니다.</li>
+    <li>실제로는 GitHub 스케줄이 부하에 따라 지연되거나 일부 건너뛰어, 최근 실행 기록을 보면 <b>하루 약 3회이고 정시가 아닙니다</b>. 이상이 아니니 놀라지 마세요.</li>
+    <li>실행이 끝나면 <code>test-reports</code>(reports/), <code>test-screenshots</code>(screenshots/)가 아티팩트로 30일간 보관됩니다. 실패 화면은 여기서 내려받아 확인합니다.</li>
+  </ul>
+  <div class="callout info"><strong>Actions가 빨간 “failure”로 보이는 경우.</strong>
+    시나리오가 1건이라도 실패하면 프로그램이 종료 코드 1로 끝나서 Actions 실행도 failure가 됩니다. 인프라 장애가 아니라 “실패 항목이 있다”는 뜻입니다. 예: 2026-11-10 07:15 KST 실행은 35/36 통과, 실패 1건(thek Mobile)이었습니다. 어떤 항목인지는 두레이 메시지나 실행 로그의 <code>ERROR 내역</code>에서 확인하세요.</div>
+</section>
+
+<!-- ───────────── ④ 수정 방법 ───────────── -->
+<section id="modify">
+  <h2><span class="n">④</span>수정 방법</h2>
+
+  <h3>4-1. 점검 대상 몰 추가 / 제외 — <code>config.yaml</code></h3>
+<pre><code>malls:
+  - name: "새몰(example)"
+    id: example
+    urls:
+      pc: "https://example.onuri.co.kr/"
+      mobile: "https://mexample.onuri.co.kr/"
+    requires_login: true
+    # login_url: "https://.../indexLogin"   # 로그인 주소가 기본 규칙과 다를 때
+    # search_valid: [수건, 텀블러]            # 이 몰 전용 검색어 (없으면 search.valid 사용)
+    # categories: [식품, 뷰티]               # 이 몰 전용 카테고리 (없으면 categories.pool 사용)
+    # skip: true                             # 삭제하지 않고 점검만 잠시 제외</code></pre>
+  <ul>
+    <li><b>제외</b>: 항목을 삭제하거나 <code>skip: true</code>를 추가합니다. 최근 poba(행정공제회)와 삼아(samaint)는 항목을 삭제해서 뺐습니다. 다시 넣을 수도 있으니 앞으로는 <code>skip: true</code>가 편합니다.</li>
+    <li><b>추가</b>: 새 몰은 같은 <code>ID</code>/<code>PASSWORD</code>로 로그인하므로 그 몰에 같은 계정이 있어야 합니다.</li>
+    <li>로그인 주소를 따로 안 주면 <code>메인 URL</code>의 <code>/main</code>을 <code>/indexLogin</code>으로 바꿔서 시도합니다(<code>tests/base.py</code>의 <code>login</code>).</li>
+  </ul>
+
+  <h3>4-2. 검색어 · 카테고리 · 봇 이름 — <code>config.yaml</code></h3>
+<pre><code>search:
+  valid: [생수, 수건, 물, ...]     # 검색 테스트용 키워드 풀 (매 실행 무작위 선택)
+categories:
+  pool: [가전/디지털, 식품, ...]   # 카테고리 테스트 풀
+  count: 5                         # 풀에서 무작위로 뽑는 개수
+dooray:
+  bot_name: "드림몰 테스트봇"      # 두레이에 표시되는 봇 이름</code></pre>
+  <p class="small">카테고리 이름은 사이트 GNB의 실제 표기와 같아야 합니다. 사이트가 카테고리명을 바꾸면 여기도 같이 바꿔야 실패하지 않습니다.</p>
+
+  <h3>4-3. 실행 주기 — <code>.github/workflows/schedule.yml</code></h3>
+  <p>cron은 <b>UTC</b>입니다. 한국 시간에서 9시간을 빼서 적습니다.</p>
+  <div class="tbl"><table>
+    <tr><th>원하는 시각 (KST)</th><th>cron (UTC)</th></tr>
+    <tr><td>매일 09:00</td><td><code>0 0 * * *</code></td></tr>
+    <tr><td>매일 09:00, 18:00</td><td><code>0 0,9 * * *</code></td></tr>
+    <tr><td>평일 09:00</td><td><code>0 0 * * 1-5</code></td></tr>
+    <tr><td>현재(6시간 간격)</td><td><code>7 */6 * * *</code></td></tr>
+  </table></div>
+  <p class="small">정각(<code>:00</code>)은 GitHub 부하가 몰려 더 늦게 도는 경향이 있어 현재처럼 어긋난 분(<code>:07</code>)을 쓰고 있습니다. cron 줄을 수정·커밋하면 알림 대상 계정도 수정자로 바뀝니다(①-7 참고).</p>
+
+  <h3>4-4. 시나리오 추가 / 변경</h3>
+  <ol>
+    <li><code>tests/test_새이름.py</code>를 만들고 <code>run(page, url, ...)</code> 함수를 작성합니다. <b>성공하면 비고 문자열을 return, 실패하면 예외(AssertionError 등)를 raise</b>합니다.</li>
+    <li><code>main.py</code> 상단의 <code>from tests import ...</code>에 모듈을 추가합니다.</li>
+    <li><code>run_platform()</code> 안에 기존 블록(예: “9. 기획전 오류 확인”)을 복사해 <code>run_test("이름", platform_label, page, lambda p: ...)</code> 형태로 추가합니다.</li>
+    <li>(선택) <code>main()</code> 안의 <code>_TEST_ALIAS</code>에 <code>--only</code> 별칭을 추가합니다.</li>
+  </ol>
+  <p><code>run_test()</code>가 예외를 잡아 실패 스크린샷 저장과 결과 객체 생성을 대신해 주므로, 시나리오 함수 안에서 따로 try/except 할 필요는 없습니다.</p>
+
+  <h3>4-5. 사이트 UI가 바뀌어 테스트가 깨질 때</h3>
+  <ul>
+    <li>먼저 재현합니다: <code>python main.py --mall 몰 --only 시나리오 --show</code></li>
+    <li>선택자(셀렉터)는 각 <code>tests/test_*.py</code> 상단 상수에 모여 있습니다. 팝업 닫기 버튼은 <code>tests/base.py</code>의 <code>POPUP_CLOSE_SELECTORS</code>, 로그인 입력칸은 같은 파일 <code>login()</code> 안의 후보 목록입니다.</li>
+    <li>실패 화면은 <code>screenshots/</code>(Actions에서는 <code>test-screenshots</code> 아티팩트)에서 확인합니다.</li>
+  </ul>
+
+  <h3>4-6. 그 밖에</h3>
+  <ul>
+    <li><b>의존성</b>: <code>requirements.txt</code> (playwright, requests, pyyaml, python-dotenv). Actions의 Python은 3.11입니다.</li>
+    <li><b>인코딩</b>: 한글이 들어간 파일(<code>config.yaml</code> 등)은 반드시 UTF-8로 저장하세요.</li>
+  </ul>
+</section>
+
+<!-- ───────────── ⑤ 문제 해결 ───────────── -->
+<section id="faq">
+  <h2><span class="n">⑤</span>자주 겪는 문제</h2>
+  <div class="tbl"><table>
+    <tr><th>증상</th><th>원인과 조치</th></tr>
+    <tr><td>두레이에 <code>[로그인] ... 실패, 계속 진행</code> 후 장바구니·배송지 등이 연달아 실패</td>
+      <td>테스트 계정의 비밀번호 변경·잠금·해당 몰 미가입이 흔한 원인입니다. 계정으로 직접 로그인해 보고, 바뀌었다면 Secrets <code>ID</code>/<code>PASSWORD</code>(와 <code>.env</code>)를 갱신합니다.</td></tr>
+    <tr><td>두레이 알림이 안 온다</td>
+      <td>웹훅 URL 만료·채널 삭제 여부 확인 → Secret <code>WEBHOOK_URL</code> 재등록. 로컬 실행이라면 <code>.env</code> 키가 <code>DOORAY_WEBHOOK_URL</code>인지 확인합니다(<code>WEBHOOK_URL</code>이면 읽히지 않음).</td></tr>
+    
+    <tr><td>특정 몰의 Mobile만 가끔 실패</td>
+      <td>모바일은 UI 구조가 달라 타이밍·선택자 이슈가 생기기 쉽습니다. 일시적인지 확인하려면 <code>--mall 몰 --show</code>로 여러 번 돌려 보세요.</td></tr>
+    <tr><td>Actions가 안 돈다</td>
+      <td>Actions 탭에서 워크플로가 <i>Disable</i> 상태인지 확인(60일 무활동 자동 중지 또는 수동 비활성). Enable 하거나 cron 줄을 수정해 커밋하면 다시 시작됩니다. <b>레포를 옮긴 직후</b>라면 ① Secrets가 등록됐는지 ② 기본 브랜치(<code>main</code>)에 워크플로 파일이 있는지 ③ 새 레포의 Actions가 켜져 있는지도 확인하세요. 스케줄은 기본 브랜치의 워크플로만 실행합니다.</td></tr>
+    <tr><td>실행 시각이 들쭉날쭉하다</td>
+      <td>GitHub 스케줄은 지연·누락이 있습니다. 설정(<code>7 */6 * * *</code>)과 실제가 달라도 정상 범위입니다.</td></tr>
+    <tr><td>로컬에서 브라우저를 못 찾는다</td>
+      <td><code>playwright install chromium</code>을 실행하세요. 코드는 <code>PLAYWRIGHT_BROWSERS_PATH</code> 또는 <code>%LOCALAPPDATA%\ms-playwright</code> 아래의 chromium을 찾습니다.</td></tr>
+  </table></div>
+</section>
+
+<!-- ───────────── ⑥ 구조 ───────────── -->
+<section id="structure">
+  <h2><span class="n">⑥</span>레포 구조</h2>
+<pre><code>UI_test/
+├── main.py                  # 진입점: 설정 로드, 몰/플랫폼별 실행, 리포트·두레이 발송
+├── config.yaml              # 몰 목록, 검색어, 카테고리, 봇 이름
+├── requirements.txt
+├── .env                     # 계정·웹훅 (git 제외, 로컬 전용)
+├── .github/workflows/
+│   ├── schedule.yml         # Actions: UI_Test scheduler
+│   └── admin_stat.yml       # Actions: 드림몰 Admin 통계
+├── tests/
+│   ├── base.py              # 브라우저 초기화, 로그인, 팝업 닫기, 스크린샷, run_test
+│   └── test_*.py            # 시나리오 9개
+├── report/
+│   ├── generator.py         # 마크다운 리포트 / 두레이 요약 메시지
+│   └── dooray.py            # 두레이 웹훅 발송
+├── screenshots/ reports/    # 결과물 (git 제외, 7일 후 자동 삭제)
+└── admin_stat/              # 드림몰 Admin 통계 전송 프로젝트 (admin_stat.yml 로 실행)</code></pre>
+  <div class="callout warn"><strong>README.md는 일부 오래됐습니다.</strong>
+    이 가이드가 현재 코드 기준입니다. README에는 아래가 현재와 다르게 적혀 있습니다.
+    <ul>
+      <li>환경변수 <code>ACCOUNT_USERNAME</code> → 실제는 <code>ID</code>/<code>PASSWORD</code></li>
+      <li>Secrets <code>username</code>/<code>password</code> → 실제는 <code>ID</code>/<code>PASSWORD</code></li>
+      <li>실행 시각 08:38·14:38 → 실제는 6시간 간격 cron</li>
+      <li>시나리오 8개 → 실제 9개 / 모바일 기기 Galaxy S5 → 실제 iPhone 14 Pro Max</li>
+      <li>config 예시가 단일 <code>urls</code> 구조 → 실제는 <code>malls</code> 목록 구조</li>
+    </ul></div>
+  <p class="small"><code>admin_stat/</code>는 Selenium 기반으로 드림몰 Admin 통계를 수집해 이메일로 전송하는 별도 프로젝트입니다. 루트의 <code>main.py</code>·<code>report/</code>와 이름이 같은 파일이 있어서, 워크플로(<code>admin_stat.yml</code>)가 항상 <code>admin_stat/</code> 폴더 안에서 실행합니다. 로컬에서도 <code>admin_stat/</code>로 이동한 뒤 <code>python main.py</code>를 실행하세요.</p>
+</section>
+
+<!-- ───────────── 부록 ───────────── -->
+<section id="appendix">
+  <h2>부록. 환경변수 · Secrets 대응표</h2>
+  <div class="tbl"><table>
+    <tr><th>GitHub Secret</th><th>환경변수 (코드가 읽는 이름)</th><th>로컬 <code>.env</code> 키</th><th>용도</th><th>Actions 등록</th></tr>
+    <tr><td><code>ID</code></td><td><code>ID</code></td><td><code>ID</code></td><td>테스트 계정 아이디</td><td>등록됨</td></tr>
+    <tr><td><code>PASSWORD</code></td><td><code>PASSWORD</code></td><td><code>PASSWORD</code></td><td>테스트 계정 비밀번호</td><td>등록됨</td></tr>
+    <tr><td><code>WEBHOOK_URL</code></td><td><code>DOORAY_WEBHOOK_URL</code></td><td><code>DOORAY_WEBHOOK_URL</code></td><td>두레이 발송</td><td>등록됨</td></tr>
+    
+    
+    
+    <tr><td>(워크플로에 직접 지정)</td><td><code>MAX_WORKERS=1</code></td><td>선택</td><td>동시 실행 수 (로컬 기본 2)</td><td>—</td></tr>
+    <tr><td>—</td><td><code>PLAYWRIGHT_BROWSERS_PATH</code></td><td>선택</td><td>Chromium 설치 경로 지정</td><td>—</td></tr>
+  </table></div>
+
+  <h3>Admin 통계(admin_stat) — Secrets와 .env는 같은 이름</h3>
+  <p>워크플로가 Secret을 같은 이름의 환경변수로 넘기므로, <code>admin_stat/.env</code>에도 같은 이름·같은 값을 넣습니다. <code>UI_Test scheduler</code>의 Secrets와 이름이 겹치지 않습니다.</p>
+  <div class="tbl"><table>
+    <tr><th>Secret / <code>.env</code> 키</th><th>용도</th><th>비고</th></tr>
+    <tr><td><code>ADMIN_USER</code>, <code>ADMIN_PASS</code></td><td>Admin 로그인 계정</td><td></td></tr>
+    <tr><td><code>EMAIL_FROM</code>, <code>EMAIL_PASSWORD</code>, <code>EMAIL_TO</code></td><td>보내는 메일 / 앱 비밀번호 / 받는 메일</td><td></td></tr>
+    <tr><td><code>EMAIL_SMTP_HOST</code>, <code>EMAIL_SMTP_PORT</code></td><td>SMTP 서버 / 포트</td><td></td></tr>
+    <tr><td><code>B2B_ADMIN_USER</code>, <code>B2B_ADMIN_PASS</code></td><td>B2B Admin 로그인 계정</td><td></td></tr>
+    <tr><td><code>SALES_EMAIL_TO</code></td><td>매출 통계 수신자</td><td>없으면 <code>EMAIL_TO</code> 사용</td></tr>
+    <tr><td><code>LOGIN_USER_FIELD</code>, <code>LOGIN_PASS_FIELD</code></td><td>로그인 입력칸 이름</td><td>선택 · 비우면 후보 이름 자동 탐지</td></tr>
+    <tr><td><code>SOLAPI_API_KEY</code>, <code>SOLAPI_API_SECRET</code>, <code>SOLAPI_FROM_NUMBER</code>, <code>KAKAO_CHANNEL_ID</code>, <code>KAKAO_TO</code></td><td>카카오 발송</td><td>선택 · 이전에 등록하지 않고 운영</td></tr>
+  </table></div>
+
+  <h3>인수 완료 전 최종 확인</h3>
+  <ol>
+    <li>Secrets <code>ID</code>, <code>PASSWORD</code>, <code>WEBHOOK_URL</code>이 로컬 <code>.env</code>의 <code>ID</code>, <code>PASSWORD</code>, 두레이 웹훅 값과 같다.</li>
+    <li>새 담당자가 본인 PC에 <code>.env</code>를 직접 만들고(git에 없음), <code>python main.py --mall dream --show</code>가 로그인까지 성공한다.</li>
+    <li>Admin 통계 Secrets가 <code>admin_stat/.env</code>와 같은 이름·값으로 등록돼 있다.</li>
+    <li>이전 담당자 PC의 <code>.env</code>를 삭제했다.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer><div class="wrap">기준일 2026-11-11. 코드가 바뀌면 내용이 달라질 수 있으니, 의심스러우면 <code>main.py</code>와 <code>config.yaml</code>을 기준으로 확인하세요.</div></footer>
+
+<script>
+document.querySelectorAll('pre').forEach(function(pre){
+  var btn = document.createElement('button');
+  btn.className = 'copy'; btn.type = 'button'; btn.textContent = '복사';
+  btn.addEventListener('click', function(){
+    var text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    function done(ok){ btn.textContent = ok ? '복사됨' : '실패'; setTimeout(function(){ btn.textContent = '복사'; }, 1400); }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+      } else { done(false); }
+    } catch (e) { done(false); }
+  });
+  pre.appendChild(btn);
+});
+</script>
+</body>
+</html>
