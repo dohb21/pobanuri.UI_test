@@ -309,9 +309,11 @@ playwright install chromium</code></pre>
     # login_url: "https://.../indexLogin"   # 로그인 주소가 기본 규칙과 다를 때
     # search_valid: [수건, 텀블러]            # 이 몰 전용 검색어 (없으면 search.valid 사용)
     # categories: [식품, 뷰티]               # 이 몰 전용 카테고리 (없으면 categories.pool 사용)
-    # skip: true                             # 삭제하지 않고 점검만 잠시 제외</code></pre>
+    # skip: true                             # 삭제하지 않고 점검만 잠시 제외
+    # skip_tests: [검색 기능, 장바구니 담기]    # 이 몰에서만 뺄 시나리오</code></pre>
   <ul>
     <li><b>제외</b>: 항목을 삭제하거나 <code>skip: true</code>를 추가합니다. 최근 poba(행정공제회)와 삼아(samaint)는 항목을 삭제해서 뺐습니다. 다시 넣을 수도 있으니 앞으로는 <code>skip: true</code>가 편합니다.</li>
+    <li><b>시나리오만 제외</b>: <code>skip_tests</code>에 시나리오 이름을 적으면 그 몰에서만 건너뜁니다. 이름은 리포트에 나오는 이름과 정확히 같아야 합니다(예: <code>검색 기능</code>, <code>하단 인기상품 목록</code>). 지금 thek은 판매 상품이 적어 <code>검색 기능</code>, <code>하단 인기상품 목록</code>, <code>장바구니 담기</code>를 뺐습니다.</li>
     <li><b>추가</b>: 새 몰은 같은 <code>ID</code>/<code>PASSWORD</code>로 로그인하므로 그 몰에 같은 계정이 있어야 합니다.</li>
     <li>로그인 주소를 따로 안 주면 <code>메인 URL</code>의 <code>/main</code>을 <code>/indexLogin</code>으로 바꿔서 시도합니다(<code>tests/base.py</code>의 <code>login</code>).</li>
   </ul>
