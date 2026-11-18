@@ -19,6 +19,7 @@ malls:
       mobile: "https://mthek.onuri.co.kr/"
     requires_login: true
     skip_tests:               # 판매 상품이 적어 점검할 수 없는 시나리오
+      - 검색 기능
       - 하단 인기상품 목록
       - 장바구니 담기
     categories:
